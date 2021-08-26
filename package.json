@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "dayjs": "^1.10.4",
+    "dotenv": "^9.0.2",
+    "node-binance-api": "^0.12.5",
+    "node-fetch": "^2.6.1"
+  }
+}

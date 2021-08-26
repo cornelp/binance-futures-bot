@@ -1,0 +1,21 @@
+# Tehnical
+- logic will be responsable of taking all the important decisions
+    - it will be helped by a strategy instance
+
+- we start by adding the exchange info on the selected coin
+- we start a strategy, we collect previous prices for a specified interval, we calculate RSI on it (inside the strategy instance)
+
+# Logic
+- checks for price failure
+- once the price has fallen and we have signs of rising up, buy position (usually 10x)
+- wait for it to grow, and then setup stop loss, with green values, if it we're to fall again
+- on 30% of profit or something, close position to take profit
+
+# How to use
+
+
+// binance.futuresBuy("ETHUSDT", qty, price);
+// binance.futuresLeverage('ETHUSDT', 50);
+// binance.futuresMarginType('ETHUSDT', 'ISOLATED');
+
+// binance.cancel('ETHUSDT', orderId, (error, response, symbol) => )
