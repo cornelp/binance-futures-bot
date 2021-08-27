@@ -1,21 +1,65 @@
-# Tehnical
-- logic will be responsable of taking all the important decisions
-    - it will be helped by a strategy instance
+get_multi_scale_signal
+    - signals un array 500 elemente, zero
+    - use_last = true
 
-- we start by adding the exchange info on the selected coin
-- we start a strategy, we collect previous prices for a specified interval, we calculate RSI on it (inside the strategy instance)
+    - ia candle pentru fiecare interval (1m)
+    - calculeaza ha si face trading_signal cu ele
+        - h12 arr
+            - face media high si low pentru fiecare
+            - le ia pe toate care sunt ha valide (cel mai vechi interval nu are anterior)
 
-# Logic
-- checks for price failure
-- once the price has fallen and we have signs of rising up, buy position (usually 10x)
-- wait for it to grow, and then setup stop loss, with green values, if it we're to fall again
-- on 30% of profit or something, close position to take profit
+        - atr arr
+            - avarage_true_range 
+                - pt fiecare ha valid max(high - low, abs(high - close anterior), abs(low - close anterior))
 
-# How to use
+        - up arr
+            - h12 - (factor, care e 1 * atr)
+        - dn arr
+            - h12 + (factor * atr)
 
 
-// binance.futuresBuy("ETHUSDT", qty, price);
-// binance.futuresLeverage('ETHUSDT', 50);
-// binance.futuresMarginType('ETHUSDT', 'ISOLATED');
+    - calculeaza trendUp si trendDown
+        - pentru fiecare ha valid
+            - daca (close anterior) e mai mare (trendUp anterior)
+                - adauga la trendUp max(up current, trendUp anterior)
+                - altfel, adauga up current
 
-// binance.cancel('ETHUSDT', orderId, (error, response, symbol) => )
+            - daca (close anterior) e mai mic trendDown anterior
+                - adauga la trendDown min(dn current, trendDown anterior)
+                - altfel, adauga dn current
+
+    - calculeaza trend si tine minte un last
+        - pentru ficare ha valid
+            - daca close current e mai mare decat trendDown anterior
+                - tr e 1
+                - last e tr
+            - daca close current e mai mare decat trendUp anterior
+                - tr e -1
+                - last e tr
+            - altfel, tr e last
+
+            - adauga tr la trend
+
+    - calculeaza entry (array) si tine iar minte un last
+        - pentru ficare trend (fara primul index)
+            - daca trend current e 1 si anterior e -1
+                - adauga la entry un 1
+                - last e 1
+
+            - daca trend current e -1 si trend anterior e 1
+                - adauga la entry un -1
+
+            - altfel, daca use_last e true
+                - adauga la entry last, altfel adauga un zero
+
+    - returneaza entry
+
+- calcul daca e mom bun de intrare in pozitie
+    - daca penultimul entry e -1
+        - deschidem SHORT
+    - daca penultimul e 1
+        - deschidem LONG
+
+- daca suntem in pozitie
+    - daca penultimul nu e zero
+        - inchide pozitia

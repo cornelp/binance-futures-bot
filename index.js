@@ -1,6 +1,6 @@
 const Binance = require("node-binance-api");
 // const Strategy = require("./src/Strategies/MomentumStrategy");
-const Strategy = require("./src/Strategies/HeikinAshiStrategy");
+const Strategy = require("./src/Strategies/TalonSniperStrategy");
 const LastPosition = require("./src/Logic/LastPosition");
 const BinanceWrapper = require("./src/Logic/BinanceWrapper");
 
@@ -12,7 +12,8 @@ const binance = new Binance().options({
 });
 
 let client = new BinanceWrapper(binance);
-let strategy = new Strategy();
+
+let strategy = new Strategy(client, new LastPosition());
 
 client
     .fetchExchangeInfo(strategy.getConfig("symbol"))
@@ -20,8 +21,6 @@ client
         strategy.getConfig("interval"),
         strategy.getConfig("candleCount"),
         (symbol, interval, data) => {
-            strategy.setCandleData(data, () => strategy.calculate());
-
-            //
+            strategy.setCandleData(data, () => strategy.run());
         }
     );

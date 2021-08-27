@@ -1,7 +1,17 @@
 class AbstractStrategy {
-    constructor() {
+    constructor(client, lastPosition) {
         this.loadConfiguration();
         this.previousPrices = [];
+
+        this.setIsBusy(true);
+
+        this.client = client;
+        this.lastPosition = lastPosition;
+    }
+
+    setIsBusy(status = true) {
+        console.log("setting busy status to " + status);
+        this.isBusy = status;
     }
 
     setCurrentPrice(currentPrice) {
@@ -59,6 +69,9 @@ class AbstractStrategy {
     setCandleData(data, callback = null) {
         const lastTimestamp = this.getLastTimestampFrom(data);
 
+        // getting current price from last candle
+        // this.setCurrentPrice(data[lastTimestamp].close);
+
         // check if timestamp has changed
         if (!this.isCandleTimestampChanged(lastTimestamp)) {
             return false;
@@ -78,6 +91,10 @@ class AbstractStrategy {
         }
 
         return this.lastTimestamp < lastTimestamp;
+    }
+
+    run() {
+        console.log("this needs to ne overwritten");
     }
 }
 

@@ -1,4 +1,5 @@
 const AbstractStrategy = require("./AbstractStrategy");
+const indicators = require("./../Indicators");
 
 class MomentumStrategy extends AbstractStrategy {
     isPriceRightForBuy() {
@@ -105,37 +106,15 @@ class MomentumStrategy extends AbstractStrategy {
         });
     }
 
-    calculateRSI() {
-        const rs = Object.keys(this.candleData).reduce(
-            (acc, key) => {
-                if (this.candleData[key].open > this.candleData[key].close) {
-                    acc.loss++;
-                }
-
-                if (this.candleData[key].open < this.candleData[key].close) {
-                    acc.gain++;
-                }
-
-                return acc;
-            },
-            { gain: 0, loss: 0 }
-        );
-
-        let rsi =
-            100 -
-            100 /
-                (1 +
-                    rs.gain /
-                        this.config.candleCount /
-                        (rs.loss / this.config.candleCount));
-
-        this.rsi = { value: rsi, timestamp: this.lastTimestamp };
-
-        console.log(this.rsi);
-    }
-
     getRSI() {
         return this.rsi;
+    }
+
+    run() {
+        this.rsi = {
+            value: indicators.rsi(this.candleData, this.config.rsiCount),
+            timestamp: this.lastTimestamp,
+        };
     }
 }
 

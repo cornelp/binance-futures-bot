@@ -11,8 +11,6 @@ class LastPosition {
         this.config = JSON.parse(
             fs.readFileSync(this.lastPositionLog, "utf-8")
         );
-
-        console.log(this.config);
     }
 
     write(data) {
