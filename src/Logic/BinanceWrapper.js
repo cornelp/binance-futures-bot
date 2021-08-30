@@ -26,7 +26,7 @@ class BinanceWrapper {
     }
 
     listenToChart(interval, candleCount, callback) {
-        this.client.websockets.chart(
+        this.client.futuresChart(
             this.symbol,
             interval,
             (symbol, interval, data) => callback(symbol, interval, data),

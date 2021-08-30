@@ -2,6 +2,9 @@ const fs = require("fs");
 
 class LastPosition {
     constructor() {
+        this.BUY = 1;
+        this.SELL = -1;
+
         this.lastPositionLog = __dirname + "/../../log/last-position.json";
 
         this.loadConfiguration();
@@ -27,8 +30,8 @@ class LastPosition {
         return value ? this.config[value] : this.config;
     }
 
-    currentOperation() {
-        //
+    getCurrentSide() {
+        return this.get("type") === this.SELL ? this.SELL : this.BUY;
     }
 }
 
