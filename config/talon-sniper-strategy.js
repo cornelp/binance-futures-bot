@@ -3,5 +3,5 @@ module.exports = {
 
     interval: "1m",
 
-    candleCount: 17,
+    candleCount: 500,
 };

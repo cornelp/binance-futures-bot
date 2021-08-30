@@ -3,6 +3,7 @@ const Binance = require("node-binance-api");
 const Strategy = require("./src/Strategies/TalonSniperStrategy");
 const LastPosition = require("./src/Logic/LastPosition");
 const BinanceWrapper = require("./src/Logic/BinanceWrapper");
+const Logger = require("./src/Logic/Logger");
 
 const binance = new Binance().options({
     APIKEY: process.env.API_KEY,
@@ -13,7 +14,7 @@ const binance = new Binance().options({
 
 let client = new BinanceWrapper(binance);
 
-let strategy = new Strategy(client, new LastPosition());
+let strategy = new Strategy(client, new LastPosition(), new Logger());
 
 client
     .fetchExchangeInfo(strategy.getConfig("symbol"))

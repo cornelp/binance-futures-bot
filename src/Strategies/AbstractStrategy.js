@@ -1,5 +1,5 @@
 class AbstractStrategy {
-    constructor(client, lastPosition) {
+    constructor(client, lastPosition, logger) {
         this.loadConfiguration();
         this.previousPrices = [];
 
@@ -7,6 +7,7 @@ class AbstractStrategy {
 
         this.client = client;
         this.lastPosition = lastPosition;
+        this.logger = logger;
     }
 
     setIsBusy(status = true) {
@@ -91,6 +92,32 @@ class AbstractStrategy {
         }
 
         return this.lastTimestamp < lastTimestamp;
+    }
+
+    isInPosition() {
+        return !this.lastPosition.get("isFinal");
+    }
+
+    getCurrentSide() {
+        return this.lastPosition.getCurrentSide();
+    }
+
+    openLong() {
+        this.logger.write(
+            "Adding LONG position at price " + this.getCurrentPrice() + "."
+        );
+    }
+
+    openShort() {
+        this.logger.write(
+            "Adding SHORT position at price " + this.getCurrentPrice() + "."
+        );
+    }
+
+    closePosition() {
+        this.logger.write(
+            "Closing position at price " + this.getCurrentPrice() + "."
+        );
     }
 
     run() {
