@@ -1,7 +1,7 @@
 module.exports = {
     heikinAshi: (candleData) => {
+        // fix index from timestamp to [0,1,2]
         ha = Object.values(candleData)
-            // fix index from timestamp to [0,1,2]
             .map((item) => ({
                 high: parseFloat(item.high),
                 low: parseFloat(item.low),
@@ -57,45 +57,29 @@ module.exports = {
         );
     },
 
-    // remove, is it useless ??
-    appendTrendInfo() {
-        const trend = this.ha.map((item) => {
-            // determine if green or red
-            // does it have wicks
-            const shadow = item.high - item.low;
-            const isRed = item.close < item.open;
+    ema(data, length) {
+        const k = 2 / (length + 1);
 
-            const body = Math.abs(item.close - item.open);
+        if (!data.hasOwnProperty("length")) {
+            data = Object.keys(data).reduce((acc, index) => {
+                acc.push(parseFloat(data[index].close));
+                return acc;
+            }, []);
+        } else if (data[0].hasOwnProperty("close")) {
+            data = data.map((item) => item.close);
+        }
 
-            const upperWick = Math.floor(
-                item.high - (isRed ? item.close : item.open)
-            );
-            const lowerWick = Math.floor(
-                (isRed ? item.close : item.open) - item.low
-            );
+        const subArr = data.slice(data.length - length);
 
-            const fatUpperWick = upperWick > 0 && upperWick / shadow > 0.33;
-            const fatLowerWick = lowerWick > 0 && lowerWick / shadow > 0.33;
+        return subArr.reduce((acc, item, index) => {
+            let previousEma =
+                index > 0
+                    ? acc[index - 1]
+                    : subArr.reduce((acc, item) => (acc += item), 0) / length;
 
-            item.trend = {
-                isRed,
-                wicks: {
-                    upper: {
-                        value: upperWick > 0,
-                        isFat: fatUpperWick,
-                    },
-                    lower: {
-                        value: lowerWick > 0,
-                        isFat: fatLowerWick,
-                    },
-                },
-                isDojo: fatLowerWick && fatUpperWick,
-                isHammer: !upperWick || !lowerWick,
-            };
+            acc.push(k * (item - previousEma) + previousEma);
 
-            // console.log(item);
-
-            return item;
-        });
+            return acc;
+        }, []);
     },
 };
