@@ -168,7 +168,7 @@ class AbstractStrategy {
             return false;
         }
 
-        if (this.candleData[this.currentCoin].length) {
+        if (this.candleData[this.currentCoin]) {
             // remove first element
             this.candleData[this.currentCoin].shift();
 
