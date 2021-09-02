@@ -1,7 +1,9 @@
+const _ = require("lodash");
+
 module.exports = {
     heikinAshi: (candleData) => {
         // fix index from timestamp to [0,1,2]
-        ha = Object.values(candleData)
+        ha = candleData
             .map((item) => ({
                 high: parseFloat(item.high),
                 low: parseFloat(item.low),
@@ -37,7 +39,7 @@ module.exports = {
     },
 
     rsi(candleData, candleCount) {
-        const rs = Object.keys(candleData).reduce(
+        const rs = candleData.reduce(
             (acc, key) => {
                 if (candleData[key].open > candleData[key].close) {
                     acc.loss++;
@@ -57,29 +59,91 @@ module.exports = {
         );
     },
 
-    ema(data, length) {
+    ema(data, length = null) {
+        if (!length) length = data.length;
+
+        // take another
+        const sma = _.sum(_.take(data, length)) / length;
+
         const k = 2 / (length + 1);
 
-        if (!data.hasOwnProperty("length")) {
-            data = Object.keys(data).reduce((acc, index) => {
-                acc.push(parseFloat(data[index].close));
+        return data.slice(length - 1).reduce((acc, item, index) => {
+            if (index === 0) {
+                acc.push(sma);
+
                 return acc;
-            }, []);
-        } else if (data[0].hasOwnProperty("close")) {
-            data = data.map((item) => item.close);
-        }
+            }
 
-        const subArr = data.slice(data.length - length);
-
-        return subArr.reduce((acc, item, index) => {
-            let previousEma =
-                index > 0
-                    ? acc[index - 1]
-                    : subArr.reduce((acc, item) => (acc += item), 0) / length;
-
-            acc.push(k * (item - previousEma) + previousEma);
+            acc.push(item * k + acc[index - 1] * (1 - k));
 
             return acc;
         }, []);
+    },
+
+    crossover(x, y, interval = 5) {
+        const firstIndex = x.length - interval;
+
+        if (x[firstIndex] > y[firstIndex]) return false;
+
+        y = _.takeRight(y, interval - 1);
+
+        return _.takeRight(x, interval - 1).some((item, index) => {
+            return item > y[index];
+        });
+    },
+
+    crossunder(x, y, interval = 5) {
+        const firstIndex = x.length - interval;
+
+        if (x[firstIndex] < y[firstIndex]) return true;
+
+        y = _.takeRight(y, interval - 1);
+
+        return _.takeRight(x, interval - 1).some((item, index) => {
+            return item < y[index];
+        });
+    },
+
+    standardDeviation(seq) {
+        let mean =
+            seq.reduce((acc, item) => (acc += parseFloat(item)), 0) /
+            seq.length;
+
+        let sum = seq
+            .map((item) => Math.pow(item - mean, 2))
+            .reduce((acc, item) => (acc += item), 0);
+
+        return Math.sqrt((1 / seq.length) * sum);
+    },
+
+    rvi(data) {
+        return data.map(
+            (item) => (item.close - item.open) / (item.high - item.low)
+        );
+    },
+
+    macd(data) {
+        // make 12 period EMA
+        const ema12 = this.ema(data, 12);
+
+        // make 26 period EMA
+        const ema26 = this.ema(data, 26);
+
+        // make diff
+        // 12 EMA - 26 EMA calculate 9 EMA from the result
+        const macd = _.takeRight(ema12, ema26.length).map((item, index) => {
+            let diff = item - ema26[index];
+
+            // console.log("item", item, "ema26", ema26[index], "diff", diff);
+
+            return diff;
+        });
+
+        const signal = this.ema(macd, 9);
+
+        return {
+            macd: _.takeRight(macd, signal.length),
+            signal,
+        };
     },
 };

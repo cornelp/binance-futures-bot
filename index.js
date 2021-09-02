@@ -1,9 +1,6 @@
 const Binance = require("node-binance-api");
-// const Strategy = require("./src/Strategies/MomentumStrategy");
-const Strategy = require("./src/Strategies/TalonSniperStrategy");
-const LastPosition = require("./src/Logic/LastPosition");
-const BinanceWrapper = require("./src/Logic/BinanceWrapper");
-const Logger = require("./src/Logic/Logger");
+const Strategy = require("./src/Strategies/MacdAndEmaStrategy.js");
+const BinanceWrapper = require("./src/Logic/BinanceWrapper.js");
 
 const binance = new Binance().options({
     APIKEY: process.env.API_KEY,
@@ -12,16 +9,8 @@ const binance = new Binance().options({
     test: process.env.IS_TEST,
 });
 
-let client = new BinanceWrapper(binance);
+// let client = new BinanceWrapper(binance);
 
-let strategy = new Strategy(client, new LastPosition(), new Logger());
+let strategy = new Strategy(binance);
 
-client
-    .fetchExchangeInfo(strategy.getConfig("symbol"))
-    .listenToChart(
-        strategy.getConfig("interval"),
-        strategy.getConfig("candleCount"),
-        (symbol, interval, data) => {
-            strategy.setCandleData(data, () => strategy.run());
-        }
-    );
+strategy.bootstrap();
