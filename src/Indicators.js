@@ -59,6 +59,12 @@ module.exports = {
         );
     },
 
+    sma(data, length = null) {
+        if (!length) length = data.length;
+
+        return _.sum(_.take(data, length)) / length;
+    },
+
     ema(data, length = null) {
         if (!length) length = data.length;
 

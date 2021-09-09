@@ -10,19 +10,19 @@ class AbstractStrategy {
         this.client = client;
         this.logger = new Logger(this.constructor.name);
 
-        this.candleMap = {
-            timestamp: 0,
-            open: 1,
-            high: 2,
-            low: 3,
-            close: 4,
-            volume: 5,
-            closeTime: 6,
-            quoteAssetVolume: 7,
-            numberOfTrades: 8,
-            takerBuyBaseVolume: 9,
-            takerBuyQuoteVolume: 10,
-        };
+        // this.candleMap = {
+        //     timestamp: 0,
+        //     open: 1,
+        //     high: 2,
+        //     low: 3,
+        //     close: 4,
+        //     volume: 5,
+        //     closeTime: 6,
+        //     quoteAssetVolume: 7,
+        //     numberOfTrades: 8,
+        //     takerBuyBaseVolume: 9,
+        //     takerBuyQuoteVolume: 10,
+        // };
 
         this.setIsBusy(false);
     }
@@ -46,42 +46,74 @@ class AbstractStrategy {
 
         this.selectCoinAndRun();
 
-        setInterval(() => this.selectCoinAndRun(), 25000);
+        setInterval(
+            () => this.selectCoinAndRun(),
+            this.getConfig("runEvery") * 1000
+        );
     }
 
     getCurrentCoin() {
         return this.coins[this.currentCoin];
     }
 
-    selectNextCoin() {
+    selectNextCoin(index = null) {
         this.currentCoin =
-            typeof this.currentCoin === "undefined" ||
-            this.currentCoin >= this.coins.length - 1
-                ? 0
-                : this.currentCoin + 1;
+            index === null
+                ? typeof this.currentCoin === "undefined" ||
+                  this.currentCoin >= this.coins.length - 1
+                    ? 0
+                    : this.currentCoin + 1
+                : index;
 
         console.log("Current coin index is " + this.currentCoin);
         console.log("Current coin is " + this.getCurrentCoin());
+
+        this.logger.write(`Let's go ${this.getCurrentCoin()}`, "start");
     }
 
     async selectCoinAndRun() {
         // stop if someone got stuck
         if (this.isBusy) {
+            this.logger.write(
+                `Another action is underway. Cannot selectCoinAndRun. Still waiting.`,
+                "busy"
+            );
+
             return;
         }
 
-        this.setIsBusy(true);
-
+        // take the next available coin
         this.selectNextCoin();
 
+        // fetch the exchange info,
+        // only if needed
         this.fetchExchangeInfo();
 
         // stop is there is action in another area
-        if (this.isLockedBy && this.isLockedBy !== this.getCurrentCoin()) {
+        if (
+            this.getIsLockedBy() &&
+            this.getIsLockedBy(true) !== this.getCurrentCoin()
+        ) {
+            if (!this.candleData) this.candleData = [];
+
             // we don't know for how long we are in locked state
             // therefore, we cannot rely on candleData anymore
-            this.candleData[this.currentCoin] = [];
-            return;
+            this.candleData = this.candleData.map((item, key) => {
+                if (key === this.getCurrentCoin()) return item;
+
+                return [];
+            }, this);
+
+            this.logger.write(
+                `Currently locked by ${this.logger.get(
+                    "symbol"
+                )}. Sorry ${this.getCurrentCoin()}, ${this.logger.get(
+                    "symbol"
+                )} will run instead`,
+                "debug"
+            );
+
+            this.selectNextCoin(this.logger.get("symbolIndex"));
         }
 
         // determine candle count
@@ -91,20 +123,27 @@ class AbstractStrategy {
                 : this.getConfig("candleCount");
 
         // fetch data
-        const data = await this.client.futuresCandles(
-            this.getCurrentCoin(),
-            this.getConfig("interval"),
-            { limit: candleCount }
-        );
+        const data = await this.client.futuresCandles({
+            symbol: this.getCurrentCoin(),
+            interval: this.getConfig("interval"),
+            limit: candleCount,
+        });
 
         // if we have fresh data, run child run()
         if (this.setCurrentCandleData(data)) {
-            console.log("calling run()");
             this.run();
         }
 
         // logic for position
         if (this.isInPosition()) {
+            this.logger.write(
+                `We are in a position on ${this.logger.get(
+                    "symbol"
+                )} and it's a ${
+                    this.logger.get("type") == 1 ? "LONG" : "SHORT"
+                }`
+            );
+
             return this.canClosePosition() && this.closePosition();
         }
 
@@ -117,9 +156,11 @@ class AbstractStrategy {
         }
 
         this.setIsBusy(false);
+
+        this.logger.write(`Finished running with no action`, "debug");
     }
 
-    fetchExchangeInfo() {
+    async fetchExchangeInfo() {
         const symbol = this.getCurrentCoin();
 
         if (!this.exchangeInfo) {
@@ -130,21 +171,17 @@ class AbstractStrategy {
             return false;
         }
 
-        this.client.exchangeInfo((err, data) => {
-            if (err) {
-                console.log(err);
-                return;
-            }
+        this.logger.write(`Fetching exchangeInfo`, "debug");
 
-            let info = data.symbols.find((item) => item.symbol === symbol);
+        const exchangeInfo = await this.client.futuresExchangeInfo();
 
-            if (!info) {
-                console.log("Symbol " + symbol + " not found.");
-                return;
-            }
+        if (!exchangeInfo.symbols) {
+            return;
+        }
 
-            this.exchangeInfo[symbol] = info;
-        });
+        exchangeInfo.symbols
+            .filter((item) => this.coins.indexOf(item.symbol) > -1, this)
+            .forEach((item) => (this.exchangeInfo[item.symbol] = item), this);
     }
 
     isCandleTimestampChanged(lastTimestamp) {
@@ -159,16 +196,17 @@ class AbstractStrategy {
             this.candleData[this.currentCoin] = [];
         }
 
-        const lastTimestamp = parseInt(
-            data[data.length - 1][this.candleMap["timestamp"]]
-        );
+        const lastTimestamp = parseInt(data[data.length - 1]["closeTime"]);
 
         // check if timestamp has changed
         if (!this.isCandleTimestampChanged(lastTimestamp)) {
             return false;
         }
 
-        if (this.candleData[this.currentCoin]) {
+        if (
+            this.candleData[this.currentCoin] &&
+            this.candleData[this.currentCoin].length
+        ) {
             // remove first element
             this.candleData[this.currentCoin].shift();
 
@@ -185,18 +223,24 @@ class AbstractStrategy {
     getCurrentCandleData(field = null) {
         const data = this.candleData ? this.candleData[this.currentCoin] : [];
 
-        if (!field) {
-            return data;
-        }
+        if (!field) return data;
 
-        const index = this.candleMap[field];
-
-        return data.map((item) => parseFloat(item[index]));
+        return data.map((item) => parseFloat(item[field]));
     }
 
     setIsBusy(status = true) {
         console.log("setting busy status to " + status);
         this.isBusy = status;
+    }
+
+    getIsLockedBy(getCoin = false) {
+        const isFinal = this.logger.get("isFinal");
+
+        if (isFinal === undefined || isFinal === true) return false;
+
+        if (!getCoin) return true;
+
+        return this.logger.get("symbol");
     }
 
     loadConfiguration() {
@@ -213,7 +257,7 @@ class AbstractStrategy {
     }
 
     getCurrentPrice() {
-        return this.getCandleData(0, "close");
+        return this.getCandleData(-1, "close");
     }
 
     setPreviousPrices(previousPrices) {
@@ -251,7 +295,7 @@ class AbstractStrategy {
             return candle;
         }
 
-        return candle[this.candleMap[prop]];
+        return candle[prop];
     }
 
     openLong() {
@@ -259,27 +303,48 @@ class AbstractStrategy {
             `Adding LONG position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`
         );
 
+        this.logger.write(`Fixed step is ${this.getFixedStep()}`, "debug");
+
+        const quantity = (
+            this.getConfig("amount") /
+            this.getCurrentPrice() /
+            this.getConfig("takerFee")
+        ).toFixed(this.getFixedStep());
+
         if (this.getConfig("isTest")) {
+            this.logger.setLastPosition({
+                type: 1,
+                symbolIndex: this.currentCoin,
+                price: this.getCurrentPrice(),
+                symbol: this.getCurrentCoin(),
+                quantity,
+                orderId: "test",
+                isFinal: false,
+            });
+
+            this.setIsBusy(false);
+
             return;
         }
 
         this.setIsBusy(true);
 
-        const qty = (this.getConfig("amount") / this.getCurrentPrice()).toFixed(
-            this.fetchFixedStep()
-        );
-
-        // symbol, qty
         this.client
-            .futuresMarketBuy(this.getCurrentCoin(), qty)
+            .futuresOrder({
+                symbol: this.getCurrentCoin(),
+                side: "BUY",
+                type: "MARKET",
+                quantity,
+            })
             .then((data) => {
                 this.setIsBusy(false);
 
                 this.logger.setLastPosition({
                     type: 1,
+                    symbolIndex: this.currentCoin,
                     price: this.getCurrentPrice(),
                     symbol: this.getCurrentCoin(),
-                    qty,
+                    quantity,
                     orderId: data.orderId,
                     isFinal: false,
                 });
@@ -291,29 +356,48 @@ class AbstractStrategy {
             `Adding SHORT position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`
         );
 
+        const quantity = (
+            this.getConfig("amount") /
+            this.getCurrentPrice() /
+            this.getConfig("takerFee")
+        ).toFixed(this.getFixedStep());
+
         // if we want to test things out,
         // we only log data to action.log
         if (this.getConfig("isTest")) {
+            this.logger.setLastPosition({
+                type: -1,
+                symbolIndex: this.currentCoin,
+                price: this.getCurrentPrice(),
+                symbol: this.getCurrentCoin(),
+                quantity,
+                orderId: "test",
+                isFinal: false,
+            });
+
+            this.setIsBusy(false);
+
             return;
         }
 
         this.setIsBusy(true);
 
-        const qty = (this.getConfig("amount") / this.getCurrentPrice()).toFixed(
-            this.fetchFixedStep()
-        );
-
-        // symbol, qty
         this.client
-            .futuresMarketSell(this.getCurrentCoin(), qty)
+            .futuresOrder({
+                symbol: this.getCurrentCoin(),
+                side: "SELL",
+                type: "MARKET",
+                quantity,
+            })
             .then((data) => {
                 this.logger.write(data);
 
                 this.logger.setLastPosition({
                     type: -1,
+                    symbolIndex: this.currentCoin,
                     price: this.getCurrentPrice(),
                     symbol: this.getCurrentCoin(),
-                    qty,
+                    quantity,
                     orderId: data.orderId,
                     isFinal: false,
                 });
@@ -324,10 +408,17 @@ class AbstractStrategy {
 
     closePosition() {
         this.logger.write(
-            `Closing position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`
+            `Closing position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
+            "close"
         );
 
         if (this.getConfig("isTest")) {
+            this.logger.setLastPosition({
+                isFinal: true,
+            });
+
+            this.setIsBusy(false);
+
             return;
         }
 
@@ -339,7 +430,9 @@ class AbstractStrategy {
                 orderId: this.logger.get("orderId"),
             },
             (err, response, symbol) => {
-                if (!err) this.setIsBusy(false);
+                if (!err) {
+                    this.setIsBusy(false);
+                }
 
                 this.logger.setLastPosition({
                     isFinal: true,
@@ -376,10 +469,22 @@ class AbstractStrategy {
         console.log("OVERWRITE ME!!");
     }
 
+    isProfitOrStopLoss() {
+        console.log("OVERWRITE ME!!");
+    }
+
     canClosePosition() {
-        this.logger.isCurrentSide("SELL")
-            ? this.isSignalLong()
-            : this.isSignalShort();
+        this.setIsBusy(true);
+
+        const response =
+            this.isProfitOrStopLoss() ||
+            (this.logger.isCurrentSide("SELL")
+                ? this.isSignalLong()
+                : this.isSignalShort());
+
+        this.setIsBusy(false);
+
+        return response;
     }
 }
 

@@ -6,11 +6,76 @@ class MomentumStrategy extends AbstractStrategy {
         super(client);
     }
 
-    run() {}
+    run() {
+        this.slowMa = indicators.ema(this.getCurrentCandleData("close"), 200);
+        this.fastMa = indicators.ema(this.getCurrentCandleData("close"), 50);
+    }
 
-    isSignalShort() {}
+    isSignalShort() {
+        const response = indicators.crossunder(this.fastMa, this.slowMa, 2);
 
-    isSignalLong() {}
+        this.logger.write(`Crossunder status: ${response}`);
+
+        return response;
+    }
+
+    isSignalLong() {
+        const response = indicators.crossover(this.fastMa, this.slowMa, 2);
+
+        this.logger.write(`Crossover status: ${response}`);
+
+        return response;
+    }
+
+    isProfitOrStopLoss() {
+        // if we don't need this feature, simply return false
+        // return false;
+
+        let profitPrice = 0;
+        let stopLossPrice = 0;
+        let status = null;
+
+        if (this.logger.isCurrentSide("BUY")) {
+            profitPrice =
+                this.logger.get("price") * (1 + this.getConfig("takeProfit"));
+            stopLossPrice =
+                this.logger.get("price") / (1 + this.getConfig("stopLoss"));
+
+            status =
+                profitPrice <= this.getCurrentPrice() ||
+                stopLossPrice >= this.getCurrentPrice();
+        } else {
+            profitPrice =
+                this.logger.get("price") / (1 + this.getConfig("takeProfit"));
+            stopLossPrice =
+                this.logger.get("price") * (1 + this.getConfig("stopLoss"));
+
+            status =
+                profitPrice >= this.getCurrentPrice() ||
+                stopLossPrice <= this.getCurrentPrice();
+        }
+
+        this.logger.write(
+            `Price on last action was ${this.logger.get("price")}`,
+            `info`
+        );
+
+        this.logger.write(`Current price is ${this.getCurrentPrice()}`, `info`);
+
+        this.logger.write(
+            `Will take profit at ${profitPrice} and stop loss at ${stopLossPrice}`,
+            `info`
+        );
+
+        this.logger.write(
+            `We ${
+                status ? "HAVE" : "DON'T HAVE"
+            } one of conditions (stopLoss, profitPrice)`,
+            "debug"
+        );
+
+        return status;
+    }
 }
 
-export default MomentumStrategy;
+module.exports = MomentumStrategy;

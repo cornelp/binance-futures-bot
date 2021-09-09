@@ -54,7 +54,7 @@ class Logger {
     }
 
     setLastPosition(values) {
-        this.config = Object.assign({}, this.config, data);
+        this.config = Object.assign({}, this.config, values);
 
         fs.writeFileSync(
             this.lastPositionLog,

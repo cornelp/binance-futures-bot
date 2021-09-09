@@ -1,11 +1,9 @@
-const Binance = require("node-binance-api");
-const Strategy = require("./src/Strategies/MacdAndEmaStrategy.js");
+const Binance = require("binance-api-node").default;
+const Strategy = require("./src/Strategies/MomentumStrategy.js");
 
-const binance = new Binance().options({
-    APIKEY: process.env.API_KEY,
-    APISECRET: process.env.API_SECRET,
-
-    test: process.env.IS_TEST,
+const binance = Binance({
+    apiKey: process.env.API_KEY,
+    apiSecret: process.env.API_SECRET,
 });
 
 let strategy = new Strategy(binance);

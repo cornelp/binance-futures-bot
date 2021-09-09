@@ -1,9 +1,9 @@
 {
     "dependencies": {
+        "binance-api-node": "^0.11.13",
         "dayjs": "^1.10.6",
         "dotenv": "^9.0.2",
         "lodash": "^4.17.21",
-        "node-binance-api": "^0.13.0",
         "node-fetch": "^2.6.1"
     }
 }
