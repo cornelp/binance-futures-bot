@@ -299,7 +299,8 @@ class AbstractStrategy {
 
     openLong() {
         this.logger.write(
-            `Adding LONG position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`
+            `Adding LONG position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
+            "transaction"
         );
 
         this.logger.write(`Fixed step is ${this.getFixedStep()}`, "debug");
@@ -352,7 +353,8 @@ class AbstractStrategy {
 
     openShort() {
         this.logger.write(
-            `Adding SHORT position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`
+            `Adding SHORT position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
+            "transaction"
         );
 
         const quantity = (
@@ -408,7 +410,7 @@ class AbstractStrategy {
     closePosition() {
         this.logger.write(
             `Closing position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
-            "close position"
+            "transaction"
         );
 
         if (this.getConfig("isTest")) {
