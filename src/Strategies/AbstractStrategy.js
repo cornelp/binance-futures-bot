@@ -64,11 +64,6 @@ class AbstractStrategy {
                     ? 0
                     : this.currentCoin + 1
                 : index;
-
-        console.log("Current coin index is " + this.currentCoin);
-        console.log("Current coin is " + this.getCurrentCoin());
-
-        this.logger.write(`Let's go ${this.getCurrentCoin()}`, "start");
     }
 
     async selectCoinAndRun() {
@@ -94,15 +89,14 @@ class AbstractStrategy {
             this.getIsLockedBy() &&
             this.getIsLockedBy(true) !== this.getCurrentCoin()
         ) {
-            if (!this.candleData) this.candleData = [];
+            if (!this.candleData) this.candleData = {};
 
             // we don't know for how long we are in locked state
             // therefore, we cannot rely on candleData anymore
-            this.candleData = this.candleData.map((item, key) => {
-                if (key === this.getCurrentCoin()) return item;
-
-                return [];
-            }, this);
+            Object.keys(this.candleData).forEach((key) => {
+                if (parseInt(key) !== parseInt(this.logger.get("symbolIndex")))
+                    delete this.candleData[key];
+            });
 
             this.logger.write(
                 `Currently locked by ${this.logger.get(
@@ -116,11 +110,15 @@ class AbstractStrategy {
             this.selectNextCoin(this.logger.get("symbolIndex"));
         }
 
+        this.logger.write(`Let's go ${this.getCurrentCoin()}`, "start");
+
         // determine candle count
         const candleCount =
             this.getCurrentCandleData() && this.getCurrentCandleData().length
                 ? this.getConfig("refreshCandleCount")
                 : this.getConfig("candleCount");
+
+        this.logger.write(`Fetching last ${candleCount} candles.`, "info");
 
         // fetch data
         const data = await this.client.futuresCandles({
@@ -141,7 +139,8 @@ class AbstractStrategy {
                     "symbol"
                 )} and it's a ${
                     this.logger.get("type") == 1 ? "LONG" : "SHORT"
-                }`
+                }`,
+                "position"
             );
 
             return this.canClosePosition() && this.closePosition();
@@ -164,7 +163,7 @@ class AbstractStrategy {
         const symbol = this.getCurrentCoin();
 
         if (!this.exchangeInfo) {
-            this.exchangeInfo = [];
+            this.exchangeInfo = {};
         }
 
         if (this.exchangeInfo[symbol]) {
@@ -192,7 +191,7 @@ class AbstractStrategy {
 
     setCurrentCandleData(data) {
         if (!this.candleData) {
-            this.candleData = [];
+            this.candleData = {};
             this.candleData[this.currentCoin] = [];
         }
 
@@ -409,7 +408,7 @@ class AbstractStrategy {
     closePosition() {
         this.logger.write(
             `Closing position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
-            "close"
+            "close position"
         );
 
         if (this.getConfig("isTest")) {
@@ -443,7 +442,7 @@ class AbstractStrategy {
 
     getFixedStep() {
         if (!this.exchangeInfo[this.getCurrentCoin()]) {
-            return 0;
+            return null;
         }
 
         const filter = this.exchangeInfo[this.getCurrentCoin()].filters.find(
