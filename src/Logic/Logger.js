@@ -18,6 +18,7 @@ class Logger {
 
         this.actionLog = logPath + "action.log";
         this.lastPositionLog = logPath + "last-position.json";
+        this.transactionsLog = logPath + "transactions.log";
 
         this.checkIfExists(this.actionLog, false, "");
         this.checkIfExists(this.lastPositionLog, false, "{}");
@@ -60,6 +61,14 @@ class Logger {
             this.lastPositionLog,
             JSON.stringify(this.config, null, 2),
             "utf-8"
+        );
+
+        // also adding to transactions.log
+        fs.writeFileSync(
+            this.transactionsLog,
+            `Type: ${this.config.type ? "BUY" : "SELL"} price ${
+                this.config.price
+            } symbol ${this.config.symbol} quantity ${this.config.quantity}`
         );
     }
 
