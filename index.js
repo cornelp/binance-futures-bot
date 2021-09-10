@@ -1,5 +1,5 @@
 const Binance = require("binance-api-node").default;
-const Strategy = require("./src/Strategies/MomentumStrategy.js");
+const Strategy = require("./src/Strategies/ScalpingStrategy.js");
 
 const binance = Binance({
     apiKey: process.env.API_KEY,

@@ -10,20 +10,6 @@ class AbstractStrategy {
         this.client = client;
         this.logger = new Logger(this.constructor.name);
 
-        // this.candleMap = {
-        //     timestamp: 0,
-        //     open: 1,
-        //     high: 2,
-        //     low: 3,
-        //     close: 4,
-        //     volume: 5,
-        //     closeTime: 6,
-        //     quoteAssetVolume: 7,
-        //     numberOfTrades: 8,
-        //     takerBuyBaseVolume: 9,
-        //     takerBuyQuoteVolume: 10,
-        // };
-
         this.setIsBusy(false);
     }
 
@@ -44,12 +30,14 @@ class AbstractStrategy {
             return;
         }
 
-        this.selectCoinAndRun();
+        this.fetchExchangeInfo().then((data) => {
+            this.selectCoinAndRun();
 
-        setInterval(
-            () => this.selectCoinAndRun(),
-            this.getConfig("runEvery") * 1000
-        );
+            setInterval(
+                () => this.selectCoinAndRun(),
+                this.getConfig("runEvery") * 1000
+            );
+        });
     }
 
     getCurrentCoin() {
@@ -79,10 +67,6 @@ class AbstractStrategy {
 
         // take the next available coin
         this.selectNextCoin();
-
-        // fetch the exchange info,
-        // only if needed
-        this.fetchExchangeInfo();
 
         // stop is there is action in another area
         if (
@@ -133,7 +117,7 @@ class AbstractStrategy {
         }
 
         // logic for position
-        if (this.isInPosition()) {
+        if (this.logger.isInPosition()) {
             this.logger.write(
                 `We are in a position on ${this.logger.get(
                     "symbol"
@@ -143,7 +127,7 @@ class AbstractStrategy {
                 "position"
             );
 
-            return this.canClosePosition() && this.closePosition();
+            return this.canClosePosition() ? this.closePosition() : null;
         }
 
         if (this.isSignalLong()) {
@@ -155,8 +139,12 @@ class AbstractStrategy {
         }
 
         this.setIsBusy(false);
+    }
 
-        this.logger.write(`Finished running with no action`, "debug");
+    getExchangeInfo(type = null) {
+        return type
+            ? this.exchangeInfo[this.getCurrentCoin()][type]
+            : this.exchangeInfo[this.getCurrentCoin()];
     }
 
     async fetchExchangeInfo() {
@@ -180,7 +168,24 @@ class AbstractStrategy {
 
         exchangeInfo.symbols
             .filter((item) => this.coins.indexOf(item.symbol) > -1, this)
-            .forEach((item) => (this.exchangeInfo[item.symbol] = item), this);
+            .forEach((item) => {
+                const stepSize = Math.max(
+                    item.filters[1].stepSize.toString().indexOf("1") - 1,
+                    0
+                );
+                const tickSize = Math.max(
+                    item.filters[0].tickSize.toString().indexOf("1") - 1,
+                    0
+                );
+
+                this.exchangeInfo[item.symbol] = {
+                    minQty: item.filters[1].minQty,
+                    stepSize,
+                    tickSize,
+                };
+            }, this);
+
+        return exchangeInfo;
     }
 
     isCandleTimestampChanged(lastTimestamp) {
@@ -228,7 +233,6 @@ class AbstractStrategy {
     }
 
     setIsBusy(status = true) {
-        console.log("setting busy status to " + status);
         this.isBusy = status;
     }
 
@@ -267,16 +271,6 @@ class AbstractStrategy {
         return this.config[key];
     }
 
-    isInPosition() {
-        const isFinal = this.logger.get("isFinal");
-
-        if (isFinal === undefined) {
-            return false;
-        }
-
-        return !isFinal;
-    }
-
     getCurrentSide() {
         return this.logger.getCurrentSide();
     }
@@ -303,21 +297,13 @@ class AbstractStrategy {
             "transaction"
         );
 
-        this.logger.write(`Fixed step is ${this.getFixedStep()}`, "debug");
-
-        const quantity = (
-            this.getConfig("amount") /
-            this.getCurrentPrice() /
-            this.getConfig("takerFee")
-        ).toFixed(this.getFixedStep());
-
         if (this.getConfig("isTest")) {
             this.logger.setLastPosition({
                 type: 1,
                 symbolIndex: this.currentCoin,
                 price: this.getCurrentPrice(),
                 symbol: this.getCurrentCoin(),
-                quantity,
+                quantity: this.getQuantity(),
                 orderId: "test",
                 isFinal: false,
             });
@@ -351,17 +337,35 @@ class AbstractStrategy {
             });
     }
 
+    getQuantity() {
+        if (this.logger.isCurrentSide("SELL") && this.logger.isInPosition()) {
+            return this.logger.get("quantity");
+        }
+
+        // if we want to buy,
+        // get the (amount / current price).toFixed(this.getTickSize())
+        const quantity = this.getConfig("amount") / this.getCurrentPrice();
+
+        if (quantity < this.getExchangeInfo("minQty")) {
+            return 0;
+        }
+
+        return quantity.toFixed(this.getExchangeInfo("stepSize"));
+    }
+
     openShort() {
         this.logger.write(
             `Adding SHORT position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
             "transaction"
         );
 
-        const quantity = (
-            this.getConfig("amount") /
-            this.getCurrentPrice() /
-            this.getConfig("takerFee")
-        ).toFixed(this.getFixedStep());
+        const quantity = this.getQuantity();
+
+        if (quantity === 0) {
+            this.logger.write(`Qty is 0 - not enough amount?`, "debug");
+
+            return;
+        }
 
         // if we want to test things out,
         // we only log data to action.log
@@ -414,9 +418,7 @@ class AbstractStrategy {
         );
 
         if (this.getConfig("isTest")) {
-            this.logger.setLastPosition({
-                isFinal: true,
-            });
+            this.logger.setLastPosition({ isFinal: true });
 
             this.setIsBusy(false);
 
@@ -442,22 +444,6 @@ class AbstractStrategy {
         );
     }
 
-    getFixedStep() {
-        if (!this.exchangeInfo[this.getCurrentCoin()]) {
-            return null;
-        }
-
-        const filter = this.exchangeInfo[this.getCurrentCoin()].filters.find(
-            (item) => item.filterType === "LOT_SIZE"
-        );
-
-        if (!filter) {
-            return 0;
-        }
-
-        return Math.max(filter.stepSize.toString().indexOf("1") - 1, 0);
-    }
-
     run() {
         console.log("this needs to be overwritten");
     }
@@ -472,16 +458,13 @@ class AbstractStrategy {
 
     isProfitOrStopLoss() {
         console.log("OVERWRITE ME!!");
+        return false;
     }
 
     canClosePosition() {
         this.setIsBusy(true);
 
-        const response =
-            this.isProfitOrStopLoss() ||
-            (this.logger.isCurrentSide("SELL")
-                ? this.isSignalLong()
-                : this.isSignalShort());
+        const response = this.isProfitOrStopLoss();
 
         this.setIsBusy(false);
 
