@@ -62,7 +62,17 @@ module.exports = {
     sma(data, length = null) {
         if (!length) length = data.length;
 
-        return _.sum(_.take(data, length)) / length;
+        return data
+            .map((item, index) => {
+                if (index < length) return null;
+
+                const sum = data
+                    .slice(index - length, index)
+                    .reduce((acc, item) => (acc += item), 0);
+
+                return sum / length;
+            })
+            .filter((item) => item);
     },
 
     ema(data, length = null) {
@@ -86,28 +96,87 @@ module.exports = {
         }, []);
     },
 
-    crossover(x, y, interval = 5) {
-        const firstIndex = x.length - interval;
+    crossover(crosser, line, interval = 5) {
+        crosser = _.takeRight(crosser, interval);
+        line = _.takeRight(line, interval);
 
-        if (x[firstIndex] > y[firstIndex]) return false;
+        // get the min and max from crosser (retain index)
+        const maxCrosser = crosser.reduce(
+            (acc, item, index) => {
+                if (acc.val < item) {
+                    acc.val = item;
+                    acc.index = index;
+                }
 
-        y = _.takeRight(y, interval - 1);
+                return acc;
+            },
+            { val: null, index: null }
+        );
 
-        return _.takeRight(x, interval - 1).some((item, index) => {
-            return item > y[index];
-        });
+        const minCrosser = crosser.reduce(
+            (acc, item, index) => {
+                if (acc.val > item) {
+                    acc.val = item;
+                    acc.index = index;
+                }
+
+                return acc;
+            },
+            { val: null, index: null }
+        );
+
+        // check if min is before max (index)
+        if (minCrosser.index < maxCrosser.index) {
+            return false;
+        }
+
+        // check if min < line[minIndex] and max > line[maxIndex]
+        return (
+            minCrosser.val < line[minCrosser.index] &&
+            maxCrosser > line[maxCrosser.index]
+        );
     },
 
     crossunder(x, y, interval = 5) {
-        const firstIndex = x.length - interval;
 
-        if (x[firstIndex] < y[firstIndex]) return true;
+        crosser = _.takeRight(crosser, interval);
+        line = _.takeRight(line, interval);
 
-        y = _.takeRight(y, interval - 1);
+        // get the min and max from crosser (retain index)
+        const maxCrosser = crosser.reduce(
+            (acc, item, index) => {
+                if (acc.val < item) {
+                    acc.val = item;
+                    acc.index = index;
+                }
 
-        return _.takeRight(x, interval - 1).some((item, index) => {
-            return item < y[index];
-        });
+                return acc;
+            },
+            { val: null, index: null }
+        );
+
+        const minCrosser = crosser.reduce(
+            (acc, item, index) => {
+                if (acc.val > item) {
+                    acc.val = item;
+                    acc.index = index;
+                }
+
+                return acc;
+            },
+            { val: null, index: null }
+        );
+
+        // check if max is before min (index)
+        if (minCrosser.index > maxCrosser.index) {
+            return false;
+        }
+
+        // check if min > line[minIndex] and max < line[maxIndex]
+        return (
+            minCrosser.val > line[minCrosser.index] &&
+            maxCrosser < line[maxCrosser.index]
+        );
     },
 
     standardDeviation(seq) {
