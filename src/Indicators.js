@@ -96,87 +96,83 @@ module.exports = {
         }, []);
     },
 
-    crossover(crosser, line, interval = 5) {
-        crosser = _.takeRight(crosser, interval);
-        line = _.takeRight(line, interval);
+    wma(data, length = null) {
+        if (!length) length = data.length;
 
-        // get the min and max from crosser (retain index)
-        const maxCrosser = crosser.reduce(
-            (acc, item, index) => {
-                if (acc.val < item) {
-                    acc.val = item;
-                    acc.index = index;
-                }
-
-                return acc;
-            },
-            { val: null, index: null }
+        const sumMultiplier = [...Array(length).keys()].reduce(
+            (acc, key) => (acc += key + 1),
+            0
         );
 
-        const minCrosser = crosser.reduce(
-            (acc, item, index) => {
-                if (acc.val > item) {
-                    acc.val = item;
-                    acc.index = index;
-                }
+        return data
+            .map((item, index) => {
+                if (index < length - 1) return null;
 
-                return acc;
-            },
-            { val: null, index: null }
-        );
+                return data
+                    .slice(index - length + 1, index + 1)
+                    .reduce((acc, item, index) => {
+                        acc += item * ((index + 1) / sumMultiplier);
 
-        // check if min is before max (index)
-        if (minCrosser.index < maxCrosser.index) {
-            return false;
-        }
-
-        // check if min < line[minIndex] and max > line[maxIndex]
-        return (
-            minCrosser.val < line[minCrosser.index] &&
-            maxCrosser > line[maxCrosser.index]
-        );
+                        return acc;
+                    }, 0);
+            })
+            .filter((item) => item);
     },
 
-    crossunder(x, y, interval = 5) {
+    // hull moving average
+    hma(data, length = null) {
+        if (!length) length = data.length;
 
+        const wma1 = this.wma(data, Math.floor(length / 2));
+        const wma2 = this.wma(data, length);
+
+        const result = _.takeRight(wma2, wma1.length).map((item, index) => {
+            return wma2[index] * 2 - item;
+        });
+
+        return this.wma(result, Math.sqrt(length));
+    },
+
+    crossOver(crosser, line, interval = 5) {
         crosser = _.takeRight(crosser, interval);
         line = _.takeRight(line, interval);
 
-        // get the min and max from crosser (retain index)
-        const maxCrosser = crosser.reduce(
-            (acc, item, index) => {
-                if (acc.val < item) {
-                    acc.val = item;
-                    acc.index = index;
-                }
+        let isUnder = false;
+        let isCrossed = false;
 
-                return acc;
-            },
-            { val: null, index: null }
-        );
+        crosser.forEach((item, index) => {
+            if (item < line[index]) {
+                isUnder = true;
+                return;
+            }
 
-        const minCrosser = crosser.reduce(
-            (acc, item, index) => {
-                if (acc.val > item) {
-                    acc.val = item;
-                    acc.index = index;
-                }
+            if (item > line[index] && isUnder) {
+                isCrossed = true;
+            }
+        });
 
-                return acc;
-            },
-            { val: null, index: null }
-        );
+        return isCrossed;
+    },
 
-        // check if max is before min (index)
-        if (minCrosser.index > maxCrosser.index) {
-            return false;
-        }
+    crossUnder(crosser, line, interval = 5) {
+        crosser = _.takeRight(crosser, interval);
+        line = _.takeRight(line, interval);
 
-        // check if min > line[minIndex] and max < line[maxIndex]
-        return (
-            minCrosser.val > line[minCrosser.index] &&
-            maxCrosser < line[maxCrosser.index]
-        );
+        isOver = false;
+        isCrossed = false;
+
+        crosser.forEach((item, index) => {
+            if (item < line[index]) {
+                isOver = true;
+                return;
+            }
+
+            if (item > line[index] && isOver) {
+                isCrossed = true;
+            }
+        });
+
+        return isCrossed;
     },
 
     standardDeviation(seq) {
