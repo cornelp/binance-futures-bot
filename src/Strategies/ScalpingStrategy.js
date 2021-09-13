@@ -16,19 +16,12 @@ class ScalpingStrategy extends AbstractStrategy {
         const line13 = indicators.sma(this.getCurrentCandleData("close"), 13);
 
         this.crossOver =
-            indicators.crossover(line5, line8) &&
-            indicators.crossover(line5, line13);
+            indicators.crossOver(line5, line8) &&
+            indicators.crossOver(line5, line13);
 
         this.crossUnder =
-            indicators.crossunder(line5, line8) &&
-            indicators.crossunder(line5, line13);
-
-        console.log(
-            "cross over",
-            this.crossOver,
-            "cross under",
-            this.crossUnder
-        );
+            indicators.crossUnder(line5, line8) &&
+            indicators.crossUnder(line5, line13);
     }
 
     isSignalLong() {
@@ -69,7 +62,9 @@ class ScalpingStrategy extends AbstractStrategy {
         );
 
         this.logger.write(
-            `${response ? "Sounds OK to close position" : "Nothing to do"}`,
+            `${
+                response ? "Sounds OK to close position" : "Nothing to do"
+            }, current price ${currentPrice}`,
             "POSITION"
         );
 

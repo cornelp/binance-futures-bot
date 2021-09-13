@@ -12,7 +12,7 @@ class MomentumStrategy extends AbstractStrategy {
     }
 
     isSignalShort() {
-        const response = indicators.crossunder(this.fastMa, this.slowMa, 2);
+        const response = indicators.crossUnder(this.fastMa, this.slowMa, 2);
 
         this.logger.write(`Crossunder status: ${response}`);
 
@@ -20,7 +20,7 @@ class MomentumStrategy extends AbstractStrategy {
     }
 
     isSignalLong() {
-        const response = indicators.crossover(this.fastMa, this.slowMa, 2);
+        const response = indicators.crossOver(this.fastMa, this.slowMa, 2);
 
         this.logger.write(`Crossover status: ${response}`);
 

@@ -297,13 +297,24 @@ class AbstractStrategy {
             "transaction"
         );
 
+        const quantity = this.getQuantity();
+
+        if (quantity === 0) {
+            this.logger.write(
+                `Qty is 0 - not enough amount? Anyhow, stopping`,
+                "debug"
+            );
+
+            return;
+        }
+
         if (this.getConfig("isTest")) {
             this.logger.setLastPosition({
                 type: 1,
                 symbolIndex: this.currentCoin,
                 price: this.getCurrentPrice(),
                 symbol: this.getCurrentCoin(),
-                quantity: this.getQuantity(),
+                quantity,
                 orderId: "test",
                 isFinal: false,
             });
@@ -344,13 +355,15 @@ class AbstractStrategy {
 
         // if we want to buy,
         // get the (amount / current price).toFixed(this.getTickSize())
-        const quantity = this.getConfig("amount") / this.getCurrentPrice();
+        const quantity = (
+            this.getConfig("amount") / this.getCurrentPrice()
+        ).toFixed(this.getExchangeInfo("stepSize"));
 
         if (quantity < this.getExchangeInfo("minQty")) {
             return 0;
         }
 
-        return quantity.toFixed(this.getExchangeInfo("stepSize"));
+        return quantity;
     }
 
     openShort() {
@@ -418,7 +431,10 @@ class AbstractStrategy {
         );
 
         if (this.getConfig("isTest")) {
-            this.logger.setLastPosition({ isFinal: true });
+            this.logger.setLastPosition({
+                isFinal: true,
+                price: this.getCurrentPrice(),
+            });
 
             this.setIsBusy(false);
 
@@ -439,6 +455,7 @@ class AbstractStrategy {
 
                 this.logger.setLastPosition({
                     isFinal: true,
+                    price: this.getCurrentPrice(),
                 });
             }
         );

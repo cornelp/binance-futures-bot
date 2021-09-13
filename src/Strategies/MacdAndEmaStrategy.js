@@ -9,21 +9,29 @@ class MacdAndEmaStrategy extends AbstractStrategy {
     run() {
         this.ema200 = indicators.ema(this.getCurrentCandleData("close"), 200);
         this.macd = indicators.macd(this.getCurrentCandleData("close"));
+
+        this.isCrossUnder = indicators.crossUnder(
+            this.macd.macd,
+            this.macd.signal
+        );
+
+        this.isCrossOver = indicators.crossOver(
+            this.macd.macd,
+            this.macd.signal
+        );
     }
 
     isSignalShort() {
-        const isCross = indicators.crossunder(this.macd.macd, this.macd.signal);
-
         return (
-            isCross && this.currentPrice > this.ema200[this.ema200.length - 1]
+            this.isCrossUnder &&
+            this.currentPrice > this.ema200[this.ema200.length - 1]
         );
     }
 
     isSignalLong() {
-        const isCross = indicators.crossover(this.macd.macd, this.macd.signal);
-
         return (
-            isCross && this.currentPrice < this.ema200[this.ema200.length - 1]
+            this.isCrossOver &&
+            this.currentPrice < this.ema200[this.ema200.length - 1]
         );
     }
 }
