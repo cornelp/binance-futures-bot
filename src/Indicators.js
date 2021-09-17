@@ -130,7 +130,7 @@ module.exports = {
             return wma2[index] * 2 - item;
         });
 
-        return this.wma(result, Math.sqrt(length));
+        return this.wma(result, Math.floor(Math.sqrt(length)));
     },
 
     crossOver(crosser, line, interval = 5) {
@@ -162,12 +162,12 @@ module.exports = {
         isCrossed = false;
 
         crosser.forEach((item, index) => {
-            if (item < line[index]) {
+            if (item > line[index]) {
                 isOver = true;
                 return;
             }
 
-            if (item > line[index] && isOver) {
+            if (item < line[index] && isOver) {
                 isCrossed = true;
             }
         });
