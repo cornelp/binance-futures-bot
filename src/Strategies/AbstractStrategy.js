@@ -1,4 +1,5 @@
 const Logger = require("./../Logic/Logger.js");
+const dayjs = require("dayjs");
 
 class AbstractStrategy {
     constructor(client) {
@@ -122,10 +123,17 @@ class AbstractStrategy {
                 `We are in a position on ${this.logger.get(
                     "symbol"
                 )} and it's a ${
-                    this.logger.get("type") == 1 ? "LONG" : "SHORT"
+                    this.logger.isCurrentSide("BUY") ? "LONG" : "SHORT"
                 }`,
                 "position"
             );
+
+            // if the interval for bailout has been added in the config
+            // and the time is up and we're on +
+            // we can close the position;
+            // if (this.getConfig("bailTimeout") > 0 && this.getBailStatus()) {
+            //     return this.closePosition();
+            // }
 
             return this.canClosePosition() ? this.closePosition() : null;
         }
@@ -139,6 +147,13 @@ class AbstractStrategy {
         }
 
         this.setIsBusy(false);
+    }
+
+    getBailStatus() {
+        const bailTimeout = this.getConfig("bailTimeout");
+        const enteredPosition = this.logger.get("timestamp");
+
+        if (!bailTimeout || !enteredPosition) return false;
     }
 
     getExchangeInfo(type = null) {
@@ -206,6 +221,21 @@ class AbstractStrategy {
         if (!this.isCandleTimestampChanged(lastTimestamp)) {
             return false;
         }
+
+        // if the timestamp changed
+        // that means we need to overwrite the previous one
+        // there's a big chance that the previous one wasn't complete, therefore the prices changed
+        console.log(
+            "candleData",
+            this.getCandleData(-1, "closeTime"),
+            this.getCandleData(-2, "closeTime")
+        );
+
+        console.log(
+            "dataLength",
+            parseInt(data[data.length - 1]["closeTime"]),
+            parseInt(data[data.length - 2]["closeTime"])
+        );
 
         if (
             this.candleData[this.currentCoin] &&
@@ -484,6 +514,68 @@ class AbstractStrategy {
         const response = this.isProfitOrStopLoss();
 
         this.setIsBusy(false);
+
+        return response;
+    }
+
+    profitTrigger() {
+        const takeProfit = this.getConfig("takeProfit");
+        const currentPrice = parseFloat(this.getCurrentPrice());
+
+        // if we don't have a takeProfit value
+        // we never stop (actually we will when the reverse signal is present)
+        if (!takeProfit) {
+            return false;
+        }
+
+        const profitAmount = parseFloat(this.logger.get("price") * takeProfit);
+        const profitPrice =
+            parseFloat(this.logger.get("price")) +
+            this.logger.getCurrentSide() * profitAmount;
+
+        let response =
+            this.getCurrentSide() === this.logger.SELL
+                ? currentPrice <= profitPrice
+                : currentPrice >= profitPrice;
+
+        this.logger.write(`We will TP at ${profitPrice}`, "info");
+
+        this.logger.write(
+            `${
+                response ? "Sounds OK to close position" : "Nothing to do"
+            }, current price ${currentPrice}`,
+            "POSITION"
+        );
+
+        return response;
+    }
+
+    stopLossTrigger() {
+        const stopLoss = this.getConfig("stopLoss");
+        const currentPrice = parseFloat(this.getCurrentPrice());
+
+        if (!stopLoss) {
+            return false;
+        }
+
+        const stopLossAmount = parseFloat(this.logger.get("price") * stopLoss);
+        const stopLossPrice =
+            parseFloat(this.logger.get("price")) -
+            this.logger.getCurrentSide() * stopLossAmount;
+
+        let response =
+            this.getCurrentSide() === this.logger.SELL
+                ? currentPrice >= stopLossPrice
+                : currentPrice <= stopLossPrice;
+
+        this.logger.write(`We will SL at ${stopLossPrice}`, "info");
+
+        this.logger.write(
+            `${
+                response ? "Sounds OK to close position" : "Nothing to do"
+            }, current price ${currentPrice}`,
+            "POSITION"
+        );
 
         return response;
     }

@@ -5,7 +5,7 @@ module.exports = {
     isTest: true,
     amount: 20,
 
-    runEvery: 10, //sec
+    runEvery: 13, //sec
 
     takerFee: 1.0004,
     makerFee: 1.0002,

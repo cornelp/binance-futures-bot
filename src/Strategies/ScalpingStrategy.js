@@ -35,40 +35,13 @@ class ScalpingStrategy extends AbstractStrategy {
     }
 
     isProfitOrStopLoss() {
-        const currentPrice = parseFloat(this.getCurrentPrice());
+        if (this.profitTrigger() || this.stopLossTrigger()) {
+            return true;
+        }
 
-        const profitAmount = parseFloat(
-            this.logger.get("price") * this.getConfig("takeProfit")
-        );
-        const profitPrice =
-            parseFloat(this.logger.get("price")) +
-            this.logger.getCurrentSide() * profitAmount;
-
-        const stopLossAmount = parseFloat(
-            this.logger.get("price") * this.getConfig("stopLoss")
-        );
-        const stopLossPrice =
-            parseFloat(this.logger.get("price")) -
-            this.logger.getCurrentSide() * stopLossAmount;
-
-        let response =
-            this.getCurrentSide() === this.logger.SELL
-                ? currentPrice <= profitPrice || currentPrice >= stopLossPrice
-                : currentPrice >= profitPrice || currentPrice <= stopLossPrice;
-
-        this.logger.write(
-            `We will tp at ${profitPrice} and sl at ${stopLossPrice}`,
-            "info"
-        );
-
-        this.logger.write(
-            `${
-                response ? "Sounds OK to close position" : "Nothing to do"
-            }, current price ${currentPrice}`,
-            "POSITION"
-        );
-
-        return response;
+        this.logger.getCurrentSide("SELL")
+            ? this.isSignalLong()
+            : this.isSignalShort();
     }
 }
 

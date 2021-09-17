@@ -4,6 +4,6 @@ module.exports = {
     candleCount: 20,
     amount: 20,
     leverage: 3,
-    takeProfit: 0.5 / 100,
-    stopLoss: 0.9 / 100,
+    takeProfit: 0.5 / 100, // zero for no takeProfitTrigger
+    stopLoss: 0.9 / 100, // zero for no stopLossTrigger
 };

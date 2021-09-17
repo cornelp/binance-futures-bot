@@ -5,6 +5,9 @@ module.exports = {
     amount: 20,
     leverage: 3,
 
+    takeProfit: 0.5 / 100,
+    stopLoss: 0.9 / 100,
+
     fastLength: 56,
     slowLength: 76,
 };

@@ -1,4 +1,5 @@
 const AbstractStrategy = require("./AbstractStrategy");
+const indicators = require("./../Indicators");
 
 class HullMovingAverageStrategy extends AbstractStrategy {
     constructor(client) {
@@ -18,15 +19,31 @@ class HullMovingAverageStrategy extends AbstractStrategy {
     }
 
     isSignalLong() {
-        return indicators.crossOver(this.hullFastLength, this.hullSlowLength);
+        const response = indicators.crossOver(
+            this.hullFastLength,
+            this.hullSlowLength
+        );
+
+        return response;
     }
 
     isSignalShort() {
-        return indicators.crossUnder(this.hullFastLength, this.hullSlowLength);
+        const response = indicators.crossUnder(
+            this.hullFastLength,
+            this.hullSlowLength
+        );
+
+        return response;
     }
 
     isProfitOrStopLoss() {
-        return false;
+        if (this.profitTrigger() || this.stopLossTrigger()) {
+            return true;
+        }
+
+        return this.logger.isCurrentSide("SELL")
+            ? this.isSignalLong()
+            : this.isSignalShort();
     }
 }
 
