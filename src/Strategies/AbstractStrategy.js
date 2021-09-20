@@ -1,47 +1,52 @@
-const Logger = require("./../Logic/Logger.js");
-const dayjs = require("dayjs");
+const Logger = require("./../Logic/Logger");
 
 class AbstractStrategy {
-    constructor(client) {
-        this.loadConfiguration();
+    constructor() {
+        this.currentCoin = undefined;
 
-        this.setIsBusy(true);
-
-        this.client = client;
         this.logger = new Logger(this.constructor.name);
-
-        this.setIsBusy(false);
     }
 
-    bootstrap() {
-        // read coins
+    setConfiguration(config) {
+        if (!this.config) {
+            this.loadConfiguration();
+        }
+
+        this.config = Object.assign({}, this.config, config);
+        this.determineCoins();
+    }
+
+    setExchangeInfo(info) {
+        console.log(info);
+    }
+
+    getCoins() {
+        return this.coins;
+    }
+
+    getConfig(key) {
+        return this.config[key];
+    }
+
+    determineCoins() {
         const symbol = this.getConfig("symbol");
 
-        if (!symbol) {
-            this.logger.write("No coin. Nothing to do", "error");
-            return;
-        }
-
         this.coins = symbol.split(",");
-
-        if (this.coins.length > 4) {
-            // just for better testing, at the moment
-            this.logger.write("Cannot run with more than 4 coins", "error");
-            return;
-        }
-
-        this.fetchExchangeInfo().then((data) => {
-            this.selectCoinAndRun();
-
-            setInterval(
-                () => this.selectCoinAndRun(),
-                this.getConfig("runEvery") * 1000
-            );
-        });
     }
 
-    getCurrentCoin() {
-        return this.coins[this.currentCoin];
+    loadConfiguration() {
+        const configName = this.constructor.name
+            .match(/[A-Z][a-z]+/g)
+            .map((item) => item.toLowerCase())
+            .join("-");
+
+        this.config = Object.assign(
+            {},
+            require("./../../config/default"),
+            require("./../../config/" + configName)
+        );
+
+        this.determineCoins();
     }
 
     selectNextCoin(index = null) {
@@ -54,158 +59,23 @@ class AbstractStrategy {
                 : index;
     }
 
-    async selectCoinAndRun() {
-        // stop if someone got stuck
-        if (this.isBusy) {
-            this.logger.write(
-                `Another action is underway. Cannot selectCoinAndRun. Still waiting.`,
-                "busy"
-            );
-
-            return;
+    getInfo() {
+        if (!this.config) {
+            this.loadConfiguration();
         }
 
-        // take the next available coin
         this.selectNextCoin();
 
-        // stop is there is action in another area
-        if (
-            this.getIsLockedBy() &&
-            this.getIsLockedBy(true) !== this.getCurrentCoin()
-        ) {
-            if (!this.candleData) this.candleData = {};
-
-            // we don't know for how long we are in locked state
-            // therefore, we cannot rely on candleData anymore
-            Object.keys(this.candleData).forEach((key) => {
-                if (parseInt(key) !== parseInt(this.logger.get("symbolIndex")))
-                    delete this.candleData[key];
-            });
-
-            this.logger.write(
-                `Currently locked by ${this.logger.get(
-                    "symbol"
-                )}. Sorry ${this.getCurrentCoin()}, ${this.logger.get(
-                    "symbol"
-                )} will run instead`,
-                "debug"
-            );
-
-            this.selectNextCoin(this.logger.get("symbolIndex"));
-        }
-
-        this.logger.write(`Let's go ${this.getCurrentCoin()}`, "start");
-
-        // determine candle count
-        const candleCount =
-            this.getCurrentCandleData() && this.getCurrentCandleData().length
-                ? this.getConfig("refreshCandleCount")
-                : this.getConfig("candleCount");
-
-        this.logger.write(`Fetching last ${candleCount} candles.`, "info");
-
-        // fetch data
-        const data = await this.client.futuresCandles({
-            symbol: this.getCurrentCoin(),
+        return {
+            symbol: this.coins[this.currentCoin],
             interval: this.getConfig("interval"),
-            limit: candleCount,
-        });
-
-        // if we have fresh data, run child run()
-        if (this.setCurrentCandleData(data)) {
-            this.run();
-        }
-
-        // logic for position
-        if (this.logger.isInPosition()) {
-            this.logger.write(
-                `We are in a position on ${this.logger.get(
-                    "symbol"
-                )} and it's a ${
-                    this.logger.isCurrentSide("BUY") ? "LONG" : "SHORT"
-                }`,
-                "position"
-            );
-
-            // if the interval for bailout has been added in the config
-            // and the time is up and we're on +
-            // we can close the position;
-            // if (this.getConfig("bailTimeout") > 0 && this.getBailStatus()) {
-            //     return this.closePosition();
-            // }
-
-            return this.canClosePosition() ? this.closePosition() : null;
-        }
-
-        if (this.isSignalLong()) {
-            return this.openLong();
-        }
-
-        if (this.isSignalShort()) {
-            return this.openShort();
-        }
-
-        this.setIsBusy(false);
-    }
-
-    getBailStatus() {
-        const bailTimeout = this.getConfig("bailTimeout");
-        const enteredPosition = this.logger.get("timestamp");
-
-        if (!bailTimeout || !enteredPosition) return false;
-    }
-
-    getExchangeInfo(type = null) {
-        return type
-            ? this.exchangeInfo[this.getCurrentCoin()][type]
-            : this.exchangeInfo[this.getCurrentCoin()];
-    }
-
-    async fetchExchangeInfo() {
-        const symbol = this.getCurrentCoin();
-
-        if (!this.exchangeInfo) {
-            this.exchangeInfo = {};
-        }
-
-        if (this.exchangeInfo[symbol]) {
-            return false;
-        }
-
-        this.logger.write(`Fetching exchangeInfo`, "debug");
-
-        const exchangeInfo = await this.client.futuresExchangeInfo();
-
-        if (!exchangeInfo.symbols) {
-            return;
-        }
-
-        exchangeInfo.symbols
-            .filter((item) => this.coins.indexOf(item.symbol) > -1, this)
-            .forEach((item) => {
-                const stepSize = Math.max(
-                    item.filters[1].stepSize.toString().indexOf("1") - 1,
-                    0
-                );
-                const tickSize = Math.max(
-                    item.filters[0].tickSize.toString().indexOf("1") - 1,
-                    0
-                );
-
-                this.exchangeInfo[item.symbol] = {
-                    minQty: item.filters[1].minQty,
-                    stepSize,
-                    tickSize,
-                };
-            }, this);
-
-        return exchangeInfo;
-    }
-
-    isCandleTimestampChanged(lastTimestamp) {
-        const timestamp = this.getCandleData(-1, "timestamp");
-
-        return !timestamp || lastTimestamp > timestamp;
+            limit:
+                this.candleData &&
+                this.candleData[this.currentCoin] &&
+                this.candleData[this.currentCoin].length
+                    ? this.getConfig("renewCandleCount")
+                    : this.getConfig("candleCount"),
+        };
     }
 
     setCurrentCandleData(data) {
@@ -218,13 +88,20 @@ class AbstractStrategy {
 
         // check if timestamp has changed
         if (!this.isCandleTimestampChanged(lastTimestamp)) {
+            // if it did not, simply swap the last candlData with current data
+            if (this.getCandleData(-1, "closeTime") === lastTimestamp) {
+                const candleData = this.candleData[this.currentCoin];
+                const candleDataLength = candleData[candleData.length - 1];
+
+                candleData[candleDataLength] = data[data.length - 1];
+            }
+
             return false;
         }
 
         // if the timestamp changed
         // that means we need to overwrite the previous one
         // there's a big chance that the previous one wasn't complete, therefore the prices changed
-
         if (
             this.candleData[this.currentCoin] &&
             this.candleData[this.currentCoin].length
@@ -239,7 +116,14 @@ class AbstractStrategy {
             this.candleData[this.currentCoin] = data;
         }
 
-        return true;
+        // return true;
+        this.run();
+    }
+
+    isCandleTimestampChanged(lastTimestamp) {
+        const timestamp = this.getCandleData(-1, "closeTime");
+
+        return !timestamp || lastTimestamp > timestamp;
     }
 
     getCurrentCandleData(field = null) {
@@ -248,45 +132,6 @@ class AbstractStrategy {
         if (!field) return data;
 
         return data.map((item) => parseFloat(item[field]));
-    }
-
-    setIsBusy(status = true) {
-        this.isBusy = status;
-    }
-
-    getIsLockedBy(getCoin = false) {
-        const isFinal = this.logger.get("isFinal");
-
-        if (isFinal === undefined || isFinal === true) return false;
-
-        if (!getCoin) return true;
-
-        return this.logger.get("symbol");
-    }
-
-    loadConfiguration() {
-        const configName = this.constructor.name
-            .match(/[A-Z][a-z]+/g)
-            .map((item) => item.toLowerCase())
-            .join("-");
-
-        this.config = Object.assign(
-            {},
-            require("./../../config/default"),
-            require("./../../config/" + configName)
-        );
-    }
-
-    getCurrentPrice() {
-        return this.getCandleData(-1, "close");
-    }
-
-    getConfig(key) {
-        return this.config[key];
-    }
-
-    getCurrentSide() {
-        return this.logger.getCurrentSide();
     }
 
     getCandleData(index, prop = null, defaultValue = 0) {
@@ -305,201 +150,12 @@ class AbstractStrategy {
         return candle[prop];
     }
 
-    openLong() {
-        this.logger.write(
-            `Adding LONG position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
-            "transaction"
-        );
-
-        const quantity = this.getQuantity();
-
-        if (quantity === 0) {
-            this.logger.write(
-                `Qty is 0 - not enough amount? Anyhow, stopping`,
-                "debug"
-            );
-
-            return;
-        }
-
-        if (this.getConfig("isTest")) {
-            this.logger.setLastPosition({
-                type: 1,
-                symbolIndex: this.currentCoin,
-                price: this.getCurrentPrice(),
-                symbol: this.getCurrentCoin(),
-                quantity,
-                orderId: "test",
-                isFinal: false,
-            });
-
-            this.setIsBusy(false);
-
-            return;
-        }
-
-        this.setIsBusy(true);
-
-        this.client
-            .futuresOrder({
-                symbol: this.getCurrentCoin(),
-                side: "BUY",
-                type: "MARKET",
-                quantity,
-            })
-            .then((data) => {
-                this.setIsBusy(false);
-
-                this.logger.setLastPosition({
-                    type: 1,
-                    symbolIndex: this.currentCoin,
-                    price: this.getCurrentPrice(),
-                    symbol: this.getCurrentCoin(),
-                    quantity,
-                    orderId: data.orderId,
-                    isFinal: false,
-                });
-            });
+    isInPosition() {
+        return this.logger.isInPosition();
     }
 
-    getQuantity() {
-        if (this.logger.isCurrentSide("SELL") && this.logger.isInPosition()) {
-            return this.logger.get("quantity");
-        }
-
-        // if we want to buy,
-        // get the (amount / current price).toFixed(this.getTickSize())
-        const quantity = (
-            this.getConfig("amount") / this.getCurrentPrice()
-        ).toFixed(this.getExchangeInfo("stepSize"));
-
-        if (quantity < this.getExchangeInfo("minQty")) {
-            return 0;
-        }
-
-        return quantity;
-    }
-
-    openShort() {
-        this.logger.write(
-            `Adding SHORT position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
-            "transaction"
-        );
-
-        const quantity = this.getQuantity();
-
-        if (quantity === 0) {
-            this.logger.write(`Qty is 0 - not enough amount?`, "debug");
-
-            return;
-        }
-
-        // if we want to test things out,
-        // we only log data to action.log
-        if (this.getConfig("isTest")) {
-            this.logger.setLastPosition({
-                type: -1,
-                symbolIndex: this.currentCoin,
-                price: this.getCurrentPrice(),
-                symbol: this.getCurrentCoin(),
-                quantity,
-                orderId: "test",
-                isFinal: false,
-            });
-
-            this.setIsBusy(false);
-
-            return;
-        }
-
-        this.setIsBusy(true);
-
-        this.client
-            .futuresOrder({
-                symbol: this.getCurrentCoin(),
-                side: "SELL",
-                type: "MARKET",
-                quantity,
-            })
-            .then((data) => {
-                this.logger.write(data);
-
-                this.logger.setLastPosition({
-                    type: -1,
-                    symbolIndex: this.currentCoin,
-                    price: this.getCurrentPrice(),
-                    symbol: this.getCurrentCoin(),
-                    quantity,
-                    orderId: data.orderId,
-                    isFinal: false,
-                });
-
-                this.setIsBusy(false);
-            });
-    }
-
-    closePosition() {
-        this.logger.write(
-            `Closing position at price ${this.getCurrentPrice()} for ${this.getCurrentCoin()}`,
-            "transaction"
-        );
-
-        if (this.getConfig("isTest")) {
-            this.logger.setLastPosition({
-                isFinal: true,
-                price: this.getCurrentPrice(),
-            });
-
-            this.setIsBusy(false);
-
-            return;
-        }
-
-        this.setIsBusy(true);
-
-        this.client.futuresCancel(
-            this.getCurrentCoin(),
-            {
-                orderId: this.logger.get("orderId"),
-            },
-            (err, response, symbol) => {
-                if (!err) {
-                    this.setIsBusy(false);
-                }
-
-                this.logger.setLastPosition({
-                    isFinal: true,
-                    price: this.getCurrentPrice(),
-                });
-            }
-        );
-    }
-
-    run() {
-        console.log("this needs to be overwritten");
-    }
-
-    isSignalLong() {
-        console.log("OVERWRITE ME!!");
-    }
-
-    isSignalShort() {
-        console.log("OVERWRITE ME!!");
-    }
-
-    isProfitOrStopLoss() {
-        console.log("OVERWRITE ME!!");
-        return false;
-    }
-
-    canClosePosition() {
-        this.setIsBusy(true);
-
-        const response = this.isProfitOrStopLoss();
-
-        this.setIsBusy(false);
-
-        return response;
+    getCurrentPrice() {
+        return this.getCandleData(-1, "close");
     }
 
     profitTrigger() {
@@ -562,6 +218,37 @@ class AbstractStrategy {
         );
 
         return response;
+    }
+
+    getLastOrderId() {
+        return this.logger.get("orderId");
+    }
+
+    saveClosedPosition() {
+        this.logger.setLastPosition({
+            isFinal: true,
+            price: this.getCurrentPrice(),
+        });
+    }
+
+    canClosePosition() {
+        return this.isProfitOrStopLoss();
+    }
+
+    isProfitOrStopLoss() {
+        console.log("This needs to be overwritten");
+    }
+
+    isSignalShort() {
+        console.log("This needs to be overwritten");
+    }
+
+    isSignalLong() {
+        console.log("This needs to be overwritten");
+    }
+
+    run() {
+        console.log("This needs to be overwritten");
     }
 }
 

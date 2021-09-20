@@ -6,6 +6,7 @@ module.exports = {
     amount: 20,
 
     runEvery: 13, //sec
+    renewCandleCount: 3,
 
     takerFee: 1.0004,
     makerFee: 1.0002,
