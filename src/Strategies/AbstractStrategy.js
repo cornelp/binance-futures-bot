@@ -4,7 +4,6 @@ const dayjs = require("dayjs");
 class AbstractStrategy {
     constructor(client) {
         this.loadConfiguration();
-        this.previousPrices = [];
 
         this.setIsBusy(true);
 
@@ -225,17 +224,6 @@ class AbstractStrategy {
         // if the timestamp changed
         // that means we need to overwrite the previous one
         // there's a big chance that the previous one wasn't complete, therefore the prices changed
-        console.log(
-            "candleData",
-            this.getCandleData(-1, "closeTime"),
-            this.getCandleData(-2, "closeTime")
-        );
-
-        console.log(
-            "dataLength",
-            parseInt(data[data.length - 1]["closeTime"]),
-            parseInt(data[data.length - 2]["closeTime"])
-        );
 
         if (
             this.candleData[this.currentCoin] &&
@@ -291,10 +279,6 @@ class AbstractStrategy {
 
     getCurrentPrice() {
         return this.getCandleData(-1, "close");
-    }
-
-    setPreviousPrices(previousPrices) {
-        this.previousPrices = previousPrices;
     }
 
     getConfig(key) {
