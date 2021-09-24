@@ -1,12 +1,7 @@
 const AbstractStrategy = require("./AbstractStrategy.js");
 const indicators = require("./../Indicators.js");
-const fs = require("fs");
 
 class ScalpingStrategy extends AbstractStrategy {
-    constructor(client) {
-        super(client);
-    }
-
     run() {
         // get sma 5
         const line5 = indicators.sma(this.getCurrentCandleData("close"), 5);

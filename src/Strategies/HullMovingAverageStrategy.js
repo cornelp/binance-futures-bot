@@ -2,10 +2,6 @@ const AbstractStrategy = require("./AbstractStrategy");
 const indicators = require("./../Indicators");
 
 class HullMovingAverageStrategy extends AbstractStrategy {
-    constructor(client) {
-        super(client);
-    }
-
     run() {
         this.hullFastLength = indicators.hma(
             this.getCurrentCandleData("close"),

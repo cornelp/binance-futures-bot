@@ -16,12 +16,12 @@ class AbstractStrategy {
         this.determineCoins();
     }
 
-    setExchangeInfo(info) {
-        console.log(info);
-    }
-
     getCoins() {
         return this.coins;
+    }
+
+    getCoin() {
+        return this.coins[this.currentCoin];
     }
 
     getConfig(key) {
@@ -49,6 +49,10 @@ class AbstractStrategy {
         this.determineCoins();
     }
 
+    getCurrentCoin() {
+        return this.coins[this.currentCoin];
+    }
+
     selectNextCoin(index = null) {
         this.currentCoin =
             index === null
@@ -57,6 +61,10 @@ class AbstractStrategy {
                     ? 0
                     : this.currentCoin + 1
                 : index;
+    }
+
+    isCoinLast() {
+        return parseInt(this.currentCoin) >= this.coins.length - 1;
     }
 
     getInfo() {
@@ -174,7 +182,7 @@ class AbstractStrategy {
             this.logger.getCurrentSide() * profitAmount;
 
         let response =
-            this.getCurrentSide() === this.logger.SELL
+            this.logger.getCurrentSide() === this.logger.SELL
                 ? currentPrice <= profitPrice
                 : currentPrice >= profitPrice;
 
@@ -190,6 +198,10 @@ class AbstractStrategy {
         return response;
     }
 
+    getCurrentSide() {
+        return this.logger.getCurrentSide();
+    }
+
     stopLossTrigger() {
         const stopLoss = this.getConfig("stopLoss");
         const currentPrice = parseFloat(this.getCurrentPrice());
@@ -201,7 +213,7 @@ class AbstractStrategy {
         const stopLossAmount = parseFloat(this.logger.get("price") * stopLoss);
         const stopLossPrice =
             parseFloat(this.logger.get("price")) -
-            this.logger.getCurrentSide() * stopLossAmount;
+            this.getCurrentSide() * stopLossAmount;
 
         let response =
             this.getCurrentSide() === this.logger.SELL
@@ -220,8 +232,44 @@ class AbstractStrategy {
         return response;
     }
 
+    addedLongPosition(quantity, orderId = null) {
+        this.logger.setLastPosition({
+            type: 1,
+            symbolIndex: this.currentCoin,
+            price: this.getCurrentPrice(),
+            symbol: this.getCurrentCoin(),
+            quantity,
+            orderId: orderId || "test",
+            isFinal: false,
+        });
+    }
+
+    addedShortPosition(quantity, orderId = null) {
+        this.logger.setLastPosition({
+            type: -1,
+            symbolIndex: this.currentCoin,
+            price: this.getCurrentPrice(),
+            symbol: this.getCurrentCoin(),
+            quantity,
+            orderId: orderId || "test",
+            isFinal: false,
+        });
+    }
+
     getLastOrderId() {
         return this.logger.get("orderId");
+    }
+
+    getLastAmount() {
+        return this.logger.get("amount");
+    }
+
+    getLeverage() {
+        return this.logger.get("leverage") || 1;
+    }
+
+    getMarginType() {
+        return this.logger.get("marginType");
     }
 
     saveClosedPosition() {
@@ -233,6 +281,24 @@ class AbstractStrategy {
 
     canClosePosition() {
         return this.isProfitOrStopLoss();
+    }
+
+    getQuantity(info) {
+        if (this.logger.isCurrentSide("SELL") && this.logger.isInPosition()) {
+            return this.logger.get("quantity");
+        }
+
+        // if we want to buy,
+        // get the (amount / current price).toFixed(this.getTickSize())
+        const quantity = (
+            this.getConfig("amount") / this.getCurrentPrice()
+        ).toFixed(info.stepSize);
+
+        if (quantity < info.minQty) {
+            return 0;
+        }
+
+        return quantity;
     }
 
     isProfitOrStopLoss() {

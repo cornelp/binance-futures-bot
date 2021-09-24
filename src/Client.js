@@ -5,7 +5,8 @@ class Client {
         this.coins = [];
 
         this.strategies = [];
-        this.currentStrategy = null; //index of strategy
+        this.currentStrategyIndex = null; // index of strategy
+        this.currentStrategy = null; // instance
 
         this.globalConfig = null;
     }
@@ -40,81 +41,153 @@ class Client {
         return this;
     }
 
-    async run() {
-        console.log("started to run");
-
-        await this.fetchExchangeInfo();
-
-        this.runInstance();
-
-        setInterval(() => this.runInstance(), 13000);
-    }
-
-    async runInstance() {
-        console.log("starting now");
-
-        // select strategy
-        const strategy = this.selectStrategy();
-        // ask strategy for info
-        const info = strategy.getInfo();
-        // ask for candle data based on info
-        const candleData = await this.exchangeClient.futuresCandles(info);
-
-        strategy.setCurrentCandleData(candleData);
-
-        // check if we're in a position
-        if (strategy.isInPosition() && strategy.canClosePosition()) {
-            // ask for current orderId
-            const orderId = strategy.getLastOrderId();
-
+    interogateStrategy(info) {
+        if (
+            this.currentStrategy.isInPosition() &&
+            this.currentStrategy.canClosePosition()
+        ) {
             // only for test reasons
-            // this.getConfig("isTest")
-            if (true) {
-                strategy.saveClosedPosition();
-
-                // this.setIsBusy(false);
-
+            if (this.currentStrategy.getConfig("isTest")) {
+                this.currentStrategy.saveClosedPosition();
                 return;
             }
 
-            // close the position
-            this.exchangeClient.futuresCancel(
-                info.symbol,
-                { orderId },
-                (err, response, symbol) => {
-                    // if (!err) this.setIsBusy(false);
+            const type = this.currentStrategy.isCurrentSide("BUY")
+                ? "BUY"
+                : "SELL";
 
-                    strategy.saveClosedPosition();
-                }
+            // close the position
+            this.exchangeClient["futuresMarket" + type](
+                info.symbol,
+                this.currentStrategy.getLastAmount(),
+                (err, response, symbol) =>
+                    this.currentStrategy.saveClosedPosition()
             );
 
             return;
         }
 
-        // check if signal is long
-        if (strategy.isSignalLong()) {
-            // add position
-            console.log("signal is long");
+        if (!this.currentStrategy.getConfig("isTest")) {
+            // set leverage
+            this.exchangeClient.futuresLeverage(
+                info.symbol,
+                this.currentStrategy.getLeverage()
+            );
 
-            // let strategy know
+            // set margin type
+            this.exchangeClient.futuresMarginType(
+                info.symbol,
+                this.currentStrategy.getMarginType()
+            );
         }
 
-        if (strategy.isSignalShort()) {
+        // check if signal is long
+        if (this.currentStrategy.isSignalLong()) {
+            // add position
+            console.log("signal is long");
+            // get quantity
+            const quantity = this.currentStrategy.getQuantity(
+                this.getExchangeInfo(this.currentStrategy.getCoin())
+            );
+
+            // we need to have qty
+            if (quantity === 0) return;
+
+            if (this.currentStrategy.getConfig("isTest")) {
+                this.currentStrategy.addedLongPosition(quantity);
+                return;
+            }
+
+            // add order
+            this.exchangeClient
+                .futuresMarketBuy(this.currentStrategy.getCoin(), quantity)
+                .then(({}) => {
+                    // let strategy know
+                    this.currentStrategy.addedLongPosition(quantity);
+                });
+
+            return;
+        }
+
+        if (this.currentStrategy.isSignalShort()) {
             // add position
             console.log("signal is short");
+            // get quantity
+            const quantity = this.currentStrategy.getQuantity(
+                this.getExchangeInfo(this.currentStrategy.getCoin())
+            );
 
-            // let strategy know
+            // we need to have qty
+            if (quantity === 0) return;
+
+            if (this.currentStrategy.getConfig("isTest")) {
+                this.currentStrategy.addedShortPosition(quantity);
+                return;
+            }
+
+            // add order
+            this.exchangeClient
+                .futuresMarketSell(this.currentStrategy.getCoin(), quantity)
+                .then(({}) => {
+                    // let strategy know
+                    this.currentStrategy.addedShortPosition(quantity);
+                });
         }
     }
 
-    selectStrategy() {
-        this.currentStrategy =
-            this.currentStrategy === null ||
-            this.currentStrategy >= this.strategies.length - 1
-                ? 0
-                : this.currentStrategy + 1;
+    async run() {
+        await this.fetchExchangeInfo();
 
-        return this.strategies[this.currentStrategy];
+        // for every strategy
+        while (this.selectStrategy()) {
+            console.log("running on", this.currentStrategy.constructor.name);
+
+            let isCoinLast = false;
+
+            while (!isCoinLast) {
+                // get info on one coin and candle data
+                // wait for confirmation on data retrieval
+                await this.fetchCandlesForStrategy(
+                    this.currentStrategy.getInfo()
+                );
+
+                isCoinLast = this.currentStrategy.isCoinLast();
+            }
+        }
+    }
+
+    timeout(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async fetchCandlesForStrategy(info) {
+        const candleData = await this.exchangeClient.futuresCandles(info);
+
+        this.currentStrategy.setCurrentCandleData(candleData);
+
+        this.interogateStrategy(info);
+
+        // we're waiting for another 10 sec,
+        // just to be sure we don't get exchange rejection
+        // (too many requests)
+        await this.timeout(10 * 1000);
+    }
+
+    selectStrategy(index = null) {
+        if (index) {
+            this.currentStrategyIndex = index;
+            return;
+        }
+
+        this.currentStrategyIndex =
+            this.currentStrategyIndex === null ||
+            this.currentStrategyIndex >= this.strategies.length - 1
+                ? 0
+                : this.currentStrategyIndex + 1;
+
+        this.currentStrategy = this.strategies[this.currentStrategyIndex];
+
+        return this.currentStrategy;
     }
 
     getExchangeInfo(symbol) {
