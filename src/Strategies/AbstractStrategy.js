@@ -54,6 +54,12 @@ class AbstractStrategy {
     }
 
     selectNextCoin(index = null) {
+        if (this.isInPosition()) {
+            this.currentCoin = parseInt(this.logger.get('symbolIndex'));
+
+            return;
+        }
+
         this.currentCoin =
             index === null
                 ? typeof this.currentCoin === "undefined" ||
@@ -86,6 +92,14 @@ class AbstractStrategy {
         };
     }
 
+    setCandleData(index, data) {
+        const candleData = this.candleData[this.currentCoin];
+
+        index = index < 0 ? candleData.length + index : index;
+        
+        this.candleData[this.currentCoin][index] = data;
+    }
+
     setCurrentCandleData(data) {
         if (!this.candleData) {
             this.candleData = {};
@@ -96,33 +110,29 @@ class AbstractStrategy {
 
         // check if timestamp has changed
         if (!this.isCandleTimestampChanged(lastTimestamp)) {
-            // if it did not, simply swap the last candlData with current data
-            if (this.getCandleData(-1, "closeTime") === lastTimestamp) {
-                const candleData = this.candleData[this.currentCoin];
-                const candleDataLength = candleData[candleData.length - 1];
-
-                candleData[candleDataLength] = data[data.length - 1];
-            }
-
-            return false;
-        }
-
-        // if the timestamp changed
-        // that means we need to overwrite the previous one
-        // there's a big chance that the previous one wasn't complete, therefore the prices changed
-        if (
-            this.candleData[this.currentCoin] &&
-            this.candleData[this.currentCoin].length
-        ) {
-            // remove first element
-            this.candleData[this.currentCoin].shift();
-
-            // inject the last
-            this.candleData[this.currentCoin].push(data[data.length - 1]);
+            this.setCandleData(-1, data[data.length - 1]);
         } else {
-            // set data
-            this.candleData[this.currentCoin] = data;
+            if (
+                this.candleData[this.currentCoin] &&
+                this.candleData[this.currentCoin].length
+            ) {
+                // if the timestamp changed
+                // that means we need to overwrite the previous one
+                // there's a big chance that the previous one wasn't complete, therefore the prices changed
+                this.setCandleData(-2, data[data.length - 2]);
+
+                // remove first element
+                this.candleData[this.currentCoin].shift();
+
+                // inject the last
+                this.candleData[this.currentCoin].push(data[data.length - 1]);
+            } else {
+                // set data
+                this.candleData[this.currentCoin] = data;
+            }
         }
+
+        console.log(`Current price is ${this.getCurrentPrice()}`);
 
         // return true;
         this.run();

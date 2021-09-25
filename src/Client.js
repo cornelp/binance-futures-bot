@@ -42,27 +42,26 @@ class Client {
     }
 
     interogateStrategy(info) {
-        if (
-            this.currentStrategy.isInPosition() &&
-            this.currentStrategy.canClosePosition()
-        ) {
-            // only for test reasons
-            if (this.currentStrategy.getConfig("isTest")) {
-                this.currentStrategy.saveClosedPosition();
-                return;
+        if (this.currentStrategy.isInPosition()) {
+            if (this.currentStrategy.canClosePosition()) {
+                // only for test reasons
+                if (this.currentStrategy.getConfig("isTest")) {
+                    this.currentStrategy.saveClosedPosition();
+                    return;
+                }
+
+                const type = this.currentStrategy.isCurrentSide("BUY")
+                    ? "BUY"
+                    : "SELL";
+
+                // close the position
+                this.exchangeClient["futuresMarket" + type](
+                    info.symbol,
+                    this.currentStrategy.getLastAmount(),
+                    (err, response, symbol) =>
+                        this.currentStrategy.saveClosedPosition()
+                );
             }
-
-            const type = this.currentStrategy.isCurrentSide("BUY")
-                ? "BUY"
-                : "SELL";
-
-            // close the position
-            this.exchangeClient["futuresMarket" + type](
-                info.symbol,
-                this.currentStrategy.getLastAmount(),
-                (err, response, symbol) =>
-                    this.currentStrategy.saveClosedPosition()
-            );
 
             return;
         }
@@ -162,6 +161,7 @@ class Client {
 
     async fetchCandlesForStrategy(info) {
         const candleData = await this.exchangeClient.futuresCandles(info);
+        console.log(`running for ${info.symbol}, fetching ${info.limit}`);
 
         this.currentStrategy.setCurrentCandleData(candleData);
 

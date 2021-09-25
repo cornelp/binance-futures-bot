@@ -1,5 +1,6 @@
 module.exports = {
-    symbol: "ETHUSDT,ADAUSDT,EGLDUSDT,NKNUSDT",
+    // symbol: "ETHUSDT,ADAUSDT,EGLDUSDT,NKNUSDT",
+    symbol: "ETHUSDT",
     interval: "5m",
     candleCount: 20,
     amount: 20,

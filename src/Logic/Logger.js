@@ -70,10 +70,10 @@ class Logger {
 
         let message =
             values.hasOwnProperty("isFinal") && values.isFinal === true
-                ? `Closing position on ${this.config.symbol} qty ${this.config.quantity}, price ${this.config.price}`
-                : `Type: ${this.config.type === 1 ? "LONG" : "SHORT"} price ${
+                ? `Closing position ${this.config.symbol}; qty ${this.config.quantity}; price ${this.config.price}`
+                : `Type: ${this.config.type === 1 ? "LONG" : "SHORT"}; price ${
                       this.config.price
-                  } symbol ${this.config.symbol} quantity ${
+                  }; symbol ${this.config.symbol}; quantity ${
                       this.config.quantity
                   }`;
 
