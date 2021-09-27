@@ -1,11 +1,14 @@
 const Client = require("./src/Client");
-const BinanceWrapper = require('./src/Exchanges/BinanceWrapper');
+const BinanceWrapper = require("./src/Exchanges/BinanceWrapper");
 const ScalpingStrategy = require("./src/Strategies/ScalpingStrategy");
-const HullMovingAgerageStrategy = require("./src/Strategies/HullMovingAverageStrategy");
+const EngulfingStrategy = require("./src/Strategies/EngulfingStrategy");
 
-(new Client)
-    .setExchangeClient(new BinanceWrapper)
-    .setStrategies([
-        new ScalpingStrategy()
-    ])
+require("dotenv").config();
+
+const apiKey = process.env.API_KEY;
+const apiSecret = process.env.API_SECRET;
+
+new Client()
+    .setExchangeClient(new BinanceWrapper(apiKey, apiSecret))
+    .setStrategies([new ScalpingStrategy(), new EngulfingStrategy()])
     .run();
