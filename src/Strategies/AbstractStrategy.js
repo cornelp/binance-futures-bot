@@ -69,6 +69,8 @@ class AbstractStrategy {
         // take the next available coin
         this.selectNextCoin();
 
+        const symbol = this.getCurrentCoin();
+
         // stop is there is action in another area
         if (
             this.getIsLockedBy() &&
@@ -165,16 +167,6 @@ class AbstractStrategy {
     async fetchExchangeInfo() {
         const symbol = this.getCurrentCoin();
 
-        await this.client.futuresLeverage({
-            symbol: this.currentCoin(),
-            leverage: this.getConfig("leverage"),
-        });
-
-        await client.futuresMarginType({
-            symbol: this.currentCoin(),
-            marginType: "ISOLATED",
-        });
-
         if (!this.exchangeInfo) {
             this.exchangeInfo = {};
         }
@@ -235,18 +227,6 @@ class AbstractStrategy {
         // if the timestamp changed
         // that means we need to overwrite the previous one
         // there's a big chance that the previous one wasn't complete, therefore the prices changed
-        console.log(
-            "candleData",
-            this.getCandleData(-1, "closeTime"),
-            this.getCandleData(-2, "closeTime")
-        );
-
-        console.log(
-            "dataLength",
-            parseInt(data[data.length - 1]["closeTime"]),
-            parseInt(data[data.length - 2]["closeTime"])
-        );
-
         if (
             this.candleData[this.currentCoin] &&
             this.candleData[this.currentCoin].length
@@ -396,7 +376,8 @@ class AbstractStrategy {
         // if we want to buy,
         // get the (amount / current price).toFixed(this.getTickSize())
         const quantity = (
-            this.getConfig("amount") / this.getCurrentPrice()
+            (this.getConfig("amount") * this.getConfig("leverage")) /
+            this.getCurrentPrice()
         ).toFixed(this.getExchangeInfo("stepSize"));
 
         if (quantity < this.getExchangeInfo("minQty")) {
@@ -482,6 +463,21 @@ class AbstractStrategy {
         }
 
         this.setIsBusy(true);
+
+        this.client.futuresOrder(
+            {
+                symbol: this.getCurrentCoin(),
+                side: this.logger.isCurrentSide("BUY") ? "BUY" : "SELL",
+                type: "MARKET",
+                reduceOnly: true,
+            },
+            () => {
+                this.logger.setLastPosition({
+                    isFinal: true,
+                    price: this.getCurrentPrice(),
+                });
+            }
+        );
 
         this.client.futuresCancel(
             this.getCurrentCoin(),
