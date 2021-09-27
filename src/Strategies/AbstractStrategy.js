@@ -165,6 +165,16 @@ class AbstractStrategy {
     async fetchExchangeInfo() {
         const symbol = this.getCurrentCoin();
 
+        await this.client.futuresLeverage({
+            symbol: this.currentCoin(),
+            leverage: this.getConfig("leverage"),
+        });
+
+        await client.futuresMarginType({
+            symbol: this.currentCoin(),
+            marginType: "ISOLATED",
+        });
+
         if (!this.exchangeInfo) {
             this.exchangeInfo = {};
         }
@@ -338,16 +348,6 @@ class AbstractStrategy {
             return;
         }
 
-        await this.client.futuresLeverage({
-            symbol: this.currentCoin(),
-            leverage: this.getConfig("leverage"),
-        });
-
-        await client.futuresMarginType({
-            symbol: this.currentCoin(),
-            marginType: "ISOLATED",
-        });
-
         if (this.getConfig("isTest")) {
             this.logger.setLastPosition({
                 type: 1,
@@ -437,16 +437,6 @@ class AbstractStrategy {
 
             return;
         }
-
-        await this.client.futuresLeverage({
-            symbol: this.currentCoin(),
-            leverage: this.getConfig("leverage"),
-        });
-
-        await this.client.futuresMarginType({
-            symbol: this.currentCoin(),
-            marginType: "ISOLATED",
-        });
 
         this.setIsBusy(true);
 
