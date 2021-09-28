@@ -1,7 +1,7 @@
 const AbstractStrategy = require("./AbstractStrategy.js");
 const indicators = require("./../Support/Indicators.js");
 
-class ScalpingStrategy extends AbstractStrategy {
+class Scalping extends AbstractStrategy {
     run() {
         // get sma 5
         const line5 = indicators.sma(
@@ -49,4 +49,4 @@ class ScalpingStrategy extends AbstractStrategy {
     }
 }
 
-module.exports = ScalpingStrategy;
+module.exports = Scalping;

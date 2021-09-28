@@ -2,7 +2,7 @@ class Client {
     constructor() {
         this.coins = {};
 
-        this.candleCount = 200;
+        this.candleCount = 0;
 
         return this;
     }
@@ -107,14 +107,14 @@ class Client {
         );
 
         if (strategy.isInPosition()) {
-            this.addToLog(
-                "- currently in a position",
-                strategy.getLastPosition("symbol")
-            );
-
-            this.addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
-
-            this.addToLog(`- SL at ${strategy.getStopLossPrice()}`);
+            if (strategy.getLastPosition("symbol") === coin) {
+                this.addToLog(
+                    "- currently in a position",
+                    strategy.getLastPosition("symbol")
+                );
+                this.addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
+                this.addToLog(`- SL at ${strategy.getStopLossPrice()}`);
+            }
 
             if (
                 strategy.isCoinInPosition(coin) &&

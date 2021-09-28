@@ -1,7 +1,7 @@
 const AbstractStrategy = require("./AbstractStrategy.js");
 const indicators = require("./../Support/Indicators.js");
 
-class EngulfingStrategy extends AbstractStrategy {
+class Engulfing extends AbstractStrategy {
     run() {
         // get previous and current low price
         // get previous and current close price
@@ -32,4 +32,4 @@ class EngulfingStrategy extends AbstractStrategy {
     }
 }
 
-module.exports = EngulfingStrategy;
+module.exports = Engulfing;

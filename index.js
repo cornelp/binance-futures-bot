@@ -1,7 +1,7 @@
 const Client = require("./src/Client");
 const BinanceWrapper = require("./src/Exchanges/BinanceWrapper");
-const ScalpingStrategy = require("./src/Strategies/ScalpingStrategy");
-const EngulfingStrategy = require("./src/Strategies/EngulfingStrategy");
+const Scalping = require("./src/Strategies/Scalping");
+const Engulfing = require("./src/Strategies/Engulfing");
 const Logger = require("./src/Support/Logger");
 
 require("dotenv").config();
@@ -18,8 +18,8 @@ new Client()
     .setLogger(new Logger())
     .setExchangeClient(new BinanceWrapper(apiKey, apiSecret))
     .setStrategies([
-        new ScalpingStrategy(),
-        new EngulfingStrategy(),
-        new ScalpingStrategy(customScalpingConfig),
+        new Scalping(),
+        new Engulfing(),
+        new Scalping(customScalpingConfig),
     ])
     .run();
