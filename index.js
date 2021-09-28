@@ -2,6 +2,7 @@ const Client = require("./src/Client");
 const BinanceWrapper = require("./src/Exchanges/BinanceWrapper");
 const Scalping = require("./src/Strategies/Scalping");
 const Engulfing = require("./src/Strategies/Engulfing");
+const ScalpingEmaMacd = require("./src/Strategies/ScalpingEmaMacd");
 const Logger = require("./src/Support/Logger");
 
 require("dotenv").config();
@@ -21,5 +22,6 @@ new Client()
         new Scalping(),
         new Engulfing(),
         new Scalping(customScalpingConfig),
+        new ScalpingEmaMacd(),
     ])
     .run();

@@ -19,7 +19,7 @@ class Client {
         return this;
     }
 
-    addToLog(message, title = null) {
+    _addToLog(message, title = null) {
         if (!this.logger) {
             return;
         }
@@ -33,6 +33,13 @@ class Client {
         this.coins = strategies.reduce((acc, strategy) => {
             // get maximum candle count
             this._setCandleCount(strategy.getConfig("candleCount"));
+
+            this._addToLog(
+                `Started ${
+                    strategy.constructor.name
+                } hash ${strategy.getFullConfigName()}`,
+                "introduction"
+            );
 
             strategy.getCoins().forEach((coin) => {
                 if (!acc[coin]) acc[coin] = {};
@@ -72,7 +79,7 @@ class Client {
             for (let i = 0; i < coinKeys.length; i++) {
                 const coin = coinKeys[i];
 
-                this.addToLog("Running", coin);
+                // this.addToLog("Running", coin);
 
                 const intervals = Object.keys(this.coins[coin]);
 
@@ -100,29 +107,23 @@ class Client {
     _interogate(strategy, coin) {
         const stepSize = this.exchangeInfo[coin].stepSize;
 
-        this.addToLog(
-            `Interogating ${
-                strategy.constructor.name
-            }, price is ${strategy.getCurrentPrice()}`
-        );
+        // this.addToLog(
+        //     `Interogating ${
+        //         strategy.constructor.name
+        //     }, price is ${strategy.getCurrentPrice()}`
+        // );
 
         if (strategy.isInPosition()) {
-            if (strategy.getLastPosition("symbol") === coin) {
-                this.addToLog(
-                    "- currently in a position",
-                    strategy.getLastPosition("symbol")
-                );
-                this.addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
-                this.addToLog(`- SL at ${strategy.getStopLossPrice()}`);
-            }
-
             if (
                 strategy.isCoinInPosition(coin) &&
                 strategy.canClosePosition()
             ) {
                 const quantity = strategy.getQuantity(coin, stepSize);
 
-                this.addToLog("We can close position", coin);
+                this._addToLog(
+                    `We can close position on ${coin}, strategy ${strategy.getFullConfigName()}`,
+                    "close-position"
+                );
 
                 if (strategy.getConfig("isTest")) {
                     strategy.setLastPosition(coin, quantity, true);
@@ -142,10 +143,23 @@ class Client {
 
         if (strategy.isSignalLong()) {
             const quantity = strategy.getQuantity(coin, stepSize);
-            this.addToLog("Signal is long", coin);
+
+            strategy.setLastPosition(coin, quantity);
+
+            this._addToLog(
+                `Signal is long, coin ${coin}, strategy ${strategy.getFullConfigName()}`,
+                "enter-position"
+            );
+            this._addToLog(
+                `- currently in a position, ${
+                    strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
+                }`,
+                strategy.getLastPosition("symbol")
+            );
+            this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
+            this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
 
             if (strategy.getConfig("isTest")) {
-                strategy.setLastPosition(coin, quantity);
                 return;
             }
 
@@ -158,12 +172,26 @@ class Client {
 
         if (strategy.isSignalShort()) {
             const quantity = strategy.getQuantity(coin, stepSize);
-            this.addToLog("Signal is short on", coin);
+
+            strategy.setLastPosition(coin, quantity);
+
+            this._addToLog(
+                `Signal is short, coin ${coin}, strategy, ${strategy.getFullConfigName()}`,
+                "enter-position"
+            );
+            this._addToLog(
+                `- currently in a position, ${
+                    strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
+                }`,
+                strategy.getLastPosition("symbol")
+            );
+            this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
+            this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
 
             if (strategy.getConfig("isTest")) {
-                strategy.setLastPosition(coin, quantity);
                 return;
             }
+
             this.exchangeClient
                 .openShort(coin, quantity)
                 .then(() => strategy.setLastPosition(coin, quantity));

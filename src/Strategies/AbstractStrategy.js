@@ -14,11 +14,15 @@ class AbstractStrategy {
             this.config.mergeConfig(overwriteConfig);
         }
 
-        const fullConfigName = hash(
+        this.fullConfigName = hash(
             Object.assign({}, { name: this.constructor.name }, overwriteConfig)
         );
 
-        this.lastPosition = new LastPosition(hash(fullConfigName));
+        this.lastPosition = new LastPosition(this.fullConfigName);
+    }
+
+    getFullConfigName() {
+        return this.fullConfigName;
     }
 
     bootstrap(candleData) {
