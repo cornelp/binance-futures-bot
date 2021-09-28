@@ -1,18 +1,24 @@
 const LastPosition = require("./../Support/Strategies/LastPosition");
 const StrategyConfig = require("../Support/Strategies/StrategyConfig");
 const CandleDataHelper = require("../Support/Strategies/CandleDataHelper");
+const hash = require("object-hash");
 
 class AbstractStrategy {
-    constructor(config = {}) {
+    constructor(overwriteConfig = {}) {
         this.BUY = 1;
         this.SELL = -1;
 
-        this.lastPosition = new LastPosition(this.constructor.name);
         this.config = new StrategyConfig(this.constructor.name);
 
-        if (config) {
-            this.config.mergeConfig(config);
+        if (overwriteConfig) {
+            this.config.mergeConfig(overwriteConfig);
         }
+
+        const fullConfigName = hash(
+            Object.assign({}, { name: this.constructor.name }, overwriteConfig)
+        );
+
+        this.lastPosition = new LastPosition(hash(fullConfigName));
     }
 
     bootstrap(candleData) {
@@ -128,18 +134,45 @@ class AbstractStrategy {
         );
     }
 
-    profitTrigger() {
+    getTakeProfitPrice() {
         const takeProfit = this.getConfig("takeProfit");
         const currentPrice = parseFloat(this.getCurrentPrice());
         const lastPositionPrice = parseFloat(this.getLastPosition("price"));
 
         if (!takeProfit) {
-            return false;
+            return 0;
         }
 
         const profitAmount = parseFloat(lastPositionPrice * takeProfit);
-        const profitPrice =
-            parseFloat(lastPositionPrice) + this.getNextSide() * profitAmount;
+
+        return (
+            parseFloat(lastPositionPrice) + this.getNextSide() * profitAmount
+        );
+    }
+
+    getStopLossPrice() {
+        const stopLoss = this.getConfig("stopLoss");
+        const currentPrice = parseFloat(this.getCurrentPrice());
+        const lastPositionPrice = parseFloat(this.getLastPosition("price"));
+
+        if (!stopLoss) {
+            return 0;
+        }
+
+        const stopLossAmount = parseFloat(lastPositionPrice * stopLoss);
+
+        return (
+            parseFloat(lastPositionPrice) - this.getNextSide() * stopLossAmount
+        );
+    }
+
+    profitTrigger() {
+        const currentPrice = this.getCurrentPrice();
+        const profitPrice = this.getTakeProfitPrice();
+
+        if (profitPrice === 0) {
+            return false;
+        }
 
         let response =
             this.getNextSide() === this.SELL
@@ -150,21 +183,18 @@ class AbstractStrategy {
     }
 
     stopLossTrigger() {
-        const stopLoss = this.getConfig("stopLoss");
-        const currentPrice = parseFloat(this.getCurrentPrice());
-        const lastPositionPrice = parseFloat(this.getLastPosition("price"));
+        const currentPrice = this.getCurrentPrice();
+        const stopLossPrice = this.getStopLossPrice();
 
-        if (!stopLoss) {
+        if (stopLossPrice === 0) {
             return false;
         }
-
-        const stopLossAmount = parseFloat(lastPositionPrice * stopLoss);
-        const stopLossPrice =
-            parseFloat(lastPositionPrice) - this.getNextSide() * stopLossAmount;
 
         let response = this.isCurrentSide("SELL")
             ? currentPrice >= stopLossPrice
             : currentPrice <= stopLossPrice;
+
+        return response;
     }
 
     setLastPosition(coin, quantity, isFinal = false) {

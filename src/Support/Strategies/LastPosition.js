@@ -3,21 +3,14 @@ const path = require("path");
 const dayjs = require("dayjs");
 
 class LastPosition {
-    constructor(forCls) {
-        const logName = forCls
-            .split(/(?=[A-Z]+)/)
-            .map((item) => item.toLowerCase())
-            .join("-");
-
+    constructor(logName) {
         const logPath = path.join(__dirname, `/../../../log/${logName}/`);
 
         this.checkIfExists(logPath, true);
 
-        this.actionLog = logPath + "action.log";
         this.lastPositionLog = logPath + "last-position.json";
         this.transactionsLog = logPath + "transactions.log";
 
-        this.checkIfExists(this.actionLog, false, "");
         this.checkIfExists(this.lastPositionLog, false, "{}");
 
         this.loadLastPosition();
@@ -65,10 +58,6 @@ class LastPosition {
         );
     }
 
-    get(name) {
-        return this.lastPosition[name];
-    }
-
     wrapToTimestamp(data, title) {
         return (
             "[" +
@@ -80,12 +69,8 @@ class LastPosition {
         );
     }
 
-    write(data, title = null) {
-        data = this.wrapToTimestamp(data, title);
-
-        fs.appendFile(this.actionLog, data, (err, data) => {
-            if (err) throw err;
-        });
+    get(name) {
+        return this.lastPosition[name];
     }
 }
 

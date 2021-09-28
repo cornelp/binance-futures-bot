@@ -8,8 +8,6 @@ class BinanceWrapper {
     fetchCandle(symbol, interval, limit) {
         const info = { symbol, interval, limit };
 
-        console.log("fetching candle:", info);
-
         return this.client.futuresCandles(info);
     }
 
