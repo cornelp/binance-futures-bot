@@ -201,14 +201,14 @@ class AbstractStrategy {
         return response;
     }
 
-    setLastPosition(coin, quantity, isFinal = false) {
-        this.getLastPosition().setLastPosition({
-            type: isFinal ? this.getLastPosition("type") : this.getNextSide(),
-            symbol: coin,
-            quantity,
-            price: this.getCurrentPrice(),
-            isFinal,
-        });
+    setLastPosition(position, type = null, isFinal = false) {
+        let toMerge = { isFinal };
+
+        if (type) toMerge.type = type;
+
+        this.getLastPosition().setLastPosition(
+            Object.assign({}, position, toMerge)
+        );
     }
 
     canClosePosition() {

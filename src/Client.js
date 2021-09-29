@@ -85,12 +85,22 @@ class Client {
 
                 for (let j = 0; j < intervals.length; j++) {
                     const interval = intervals[j];
+                    let candleData = [];
 
-                    const candleData = await this.exchangeClient.fetchCandle(
-                        coin,
-                        interval,
-                        this.candleCount
-                    );
+                    try {
+                        candleData = await this.exchangeClient.fetchCandle(
+                            coin,
+                            interval,
+                            this.candleCount
+                        );
+                    } catch (e) {
+                        // simply retry
+                        candleData = await this.exchangeClient.fetchCandle(
+                            coin,
+                            interval,
+                            this.candleCount
+                        );
+                    }
 
                     this.coins[coin][interval].forEach((strategy) => {
                         strategy.bootstrap(candleData);
@@ -120,13 +130,13 @@ class Client {
             ) {
                 const quantity = strategy.getQuantity(coin, stepSize);
 
-                this._addToLog(
-                    `We can close position on ${coin}, strategy ${strategy.getFullConfigName()}`,
-                    "close-position"
-                );
-
                 if (strategy.getConfig("isTest")) {
-                    strategy.setLastPosition(coin, quantity, true);
+                    strategy.setLastPosition({}, null, true);
+
+                    this._addToLog(
+                        `We can close position on ${coin}, strategy ${strategy.getFullConfigName()}`,
+                        "close-position"
+                    );
                     return;
                 }
 
@@ -135,7 +145,7 @@ class Client {
                         coin,
                         strategy.isCurrentSide("SELL") ? "BUY" : "SELL"
                     )
-                    .then(() => strategy.setLastPosition(coin, quantity, true));
+                    .then(() => strategy.setLastPosition({}, null, true));
             }
 
             return;
@@ -144,28 +154,38 @@ class Client {
         if (strategy.isSignalLong()) {
             const quantity = strategy.getQuantity(coin, stepSize);
 
-            strategy.setLastPosition(coin, quantity);
-
-            this._addToLog(
-                `Signal is long, coin ${coin}, strategy ${strategy.getFullConfigName()}`,
-                "enter-position"
-            );
-            this._addToLog(
-                `- currently in a position, ${
-                    strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
-                }`,
-                strategy.getLastPosition("symbol")
-            );
-            this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
-            this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
-
             if (strategy.getConfig("isTest")) {
+                strategy.setLastPosition(
+                    {
+                        symbol: coin,
+                        quantity,
+                        price: strategy.getCurrentPrice(),
+                    },
+                    strategy.BUY,
+                    false
+                );
+
+                this._addToLog(
+                    `Signal is long, coin ${coin}, strategy ${strategy.getFullConfigName()}`,
+                    "enter-position"
+                );
+                this._addToLog(
+                    `- currently in a position, ${
+                        strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
+                    }`,
+                    strategy.getLastPosition("symbol")
+                );
+                this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
+                this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
+
                 return;
             }
 
             this.exchangeClient
                 .openLong(coin, quantity)
-                .then(() => strategy.setLastPosition(coin, quantity));
+                .then((response) =>
+                    strategy.setLastPosition(response, strategy.BUY, false)
+                );
 
             return;
         }
@@ -173,28 +193,38 @@ class Client {
         if (strategy.isSignalShort()) {
             const quantity = strategy.getQuantity(coin, stepSize);
 
-            strategy.setLastPosition(coin, quantity);
-
-            this._addToLog(
-                `Signal is short, coin ${coin}, strategy, ${strategy.getFullConfigName()}`,
-                "enter-position"
-            );
-            this._addToLog(
-                `- currently in a position, ${
-                    strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
-                }`,
-                strategy.getLastPosition("symbol")
-            );
-            this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
-            this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
-
             if (strategy.getConfig("isTest")) {
+                strategy.setLastPosition(
+                    {
+                        symbol: coin,
+                        quantity,
+                        price: strategy.getCurrentPrice(),
+                    },
+                    strategy.SELL,
+                    false
+                );
+
+                this._addToLog(
+                    `Signal is short, coin ${coin}, strategy, ${strategy.getFullConfigName()}`,
+                    "enter-position"
+                );
+                this._addToLog(
+                    `- currently in a position, ${
+                        strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
+                    }`,
+                    strategy.getLastPosition("symbol")
+                );
+                this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
+                this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
+
                 return;
             }
 
             this.exchangeClient
                 .openShort(coin, quantity)
-                .then(() => strategy.setLastPosition(coin, quantity));
+                .then((response) =>
+                    strategy.setLastPosition(response, strategy.SELL, false)
+                );
         }
     }
 }

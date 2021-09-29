@@ -39,13 +39,7 @@ class Scalping extends AbstractStrategy {
     }
 
     canClosePosition() {
-        if (this.profitTrigger() || this.stopLossTrigger()) {
-            return true;
-        }
-
-        return this.isCurrentSide("SELL")
-            ? this.isSignalLong()
-            : this.isSignalShort();
+        return this.profitTrigger() || this.stopLossTrigger();
     }
 }
 
