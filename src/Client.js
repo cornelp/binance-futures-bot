@@ -131,7 +131,11 @@ class Client {
                 const quantity = strategy.getQuantity(coin, stepSize);
 
                 if (strategy.getConfig("isTest")) {
-                    strategy.setLastPosition({}, null, true);
+                    strategy.setLastPosition(
+                        { price: strategy.getCurrentPrice() },
+                        null,
+                        true
+                    );
 
                     this._addToLog(
                         `We can close position on ${coin}, strategy ${strategy.getFullConfigName()}`,
@@ -145,7 +149,13 @@ class Client {
                         coin,
                         strategy.isCurrentSide("SELL") ? "BUY" : "SELL"
                     )
-                    .then(() => strategy.setLastPosition({}, null, true));
+                    .then(() =>
+                        strategy.setLastPosition(
+                            { price: strategy.getCurrentPrice() },
+                            null,
+                            true
+                        )
+                    );
             }
 
             return;
@@ -220,11 +230,13 @@ class Client {
                 return;
             }
 
-            this.exchangeClient
-                .openShort(coin, quantity)
-                .then((response) =>
-                    strategy.setLastPosition(response, strategy.SELL, false)
-                );
+            this.exchangeClient.openShort(coin, quantity).then((response) => {
+                const data = Object.assign({}, response, {
+                    price: strategy.getCurrentPrice(),
+                });
+
+                strategy.setLastPosition(data, strategy.SELL, false);
+            });
         }
     }
 }
