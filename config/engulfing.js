@@ -1,7 +1,7 @@
 module.exports = {
     symbol: "ETHUSDT,EGLDUSDT,BTCUSDT",
-    interval: "5m",
-    candleCount: 20,
+    interval: "1m",
+    candleCount: 2,
     amount: 500,
     leverage: 3,
     takeProfit: 0.5 / 100, // zero for no takeProfitTrigger

@@ -7,21 +7,15 @@ const Logger = require("./src/Support/Logger");
 
 require("dotenv").config();
 
-const apiKey = process.env.API_KEY;
-const apiSecret = process.env.API_SECRET;
-
-const customScalpingConfig = {
-    takeProfit: 0.6 / 100,
-    stopLoss: 0.3 / 100,
-};
+// const apiKey = process.env.API_KEY;
+// const apiSecret = process.env.API_SECRET;
+const apiKey =
+    "CxoFtnKSXyhCSmVsfg8XrBAIWDCGrfsLOONZjONfkLd2ynwmeRL67OYKYPexC19R";
+const apiSecret =
+    "tx2WF7gAOPVTy7wmAFqSnumqTsmyA4jMGQLOXICCbXDNkVqdWyUknodYiEZ8H4jJ";
 
 new Client()
     .setLogger(new Logger())
     .setExchangeClient(new BinanceWrapper(apiKey, apiSecret))
-    .setStrategies([
-        new Scalping(),
-        new Engulfing(),
-        new Scalping(customScalpingConfig),
-        new ScalpingEmaMacd(),
-    ])
+    .setStrategy(new Engulfing())
     .run();

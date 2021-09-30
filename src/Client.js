@@ -1,16 +1,6 @@
 class Client {
     constructor() {
         this.coins = {};
-
-        this.candleCount = 0;
-
-        return this;
-    }
-
-    _setCandleCount(candleCount) {
-        if (this.candleCount < candleCount) {
-            this.candleCount = candleCount;
-        }
     }
 
     setLogger(logger) {
@@ -29,30 +19,8 @@ class Client {
         console.log(`${message}, ${title || ""}`);
     }
 
-    setStrategies(strategies) {
-        this.coins = strategies.reduce((acc, strategy) => {
-            // get maximum candle count
-            this._setCandleCount(strategy.getConfig("candleCount"));
-
-            this._addToLog(
-                `Started ${
-                    strategy.constructor.name
-                } hash ${strategy.getFullConfigName()}`,
-                "introduction"
-            );
-
-            strategy.getCoins().forEach((coin) => {
-                if (!acc[coin]) acc[coin] = {};
-
-                const interval = strategy.getIntervalForCoin(coin);
-
-                if (!acc[coin][interval]) acc[coin][interval] = [];
-
-                acc[coin][interval].push(strategy);
-            });
-
-            return acc;
-        }, {});
+    setStrategy(strategy) {
+        this.strategy = strategy;
 
         return this;
     }
@@ -68,175 +36,73 @@ class Client {
     }
 
     async run() {
-        const coinKeys = Object.keys(this.coins);
+        const coins = this.strategy.getCoins();
 
-        // fetch exchangeInfo
-        this.exchangeInfo = await this.exchangeClient.fetchExchangeInfo(
-            coinKeys
+        // check existing positions
+        for (let i = 0; i < coins.length; i++) {
+            const coin = coins[i];
+            const hasPosition = await this.exchangeClient.coinHasPosition(coin);
+
+            this.coins[coin] = { hasPosition };
+            console.log("positions", this.coins);
+        }
+
+        // get exchangeInfo from exchangeClient
+        this.exchangeClient.summary(
+            coins,
+            this.strategy.getConfig("interval"),
+            this.strategy.getConfig("candleCount")
         );
 
-        while (true) {
-            for (let i = 0; i < coinKeys.length; i++) {
-                const coin = coinKeys[i];
+        // run callback when order is filled/partially_filled,
+        this.exchangeClient.subscribeToPosition((evt) => {
+            const coin = evt.symbol;
 
-                // this.addToLog("Running", coin);
+            // check event type
+            // this.coins[coin].hasPosition = true;
+        });
 
-                const intervals = Object.keys(this.coins[coin]);
+        this.exchangeClient.setOnCandle((candle) => {
+            const coin = candle.symbol;
 
-                for (let j = 0; j < intervals.length; j++) {
-                    const interval = intervals[j];
-                    let candleData = [];
-
-                    try {
-                        candleData = await this.exchangeClient.fetchCandle(
-                            coin,
-                            interval,
-                            this.candleCount
-                        );
-                    } catch (e) {
-                        // simply retry
-                        candleData = await this.exchangeClient.fetchCandle(
-                            coin,
-                            interval,
-                            this.candleCount
-                        );
-                    }
-
-                    this.coins[coin][interval].forEach((strategy) => {
-                        strategy.bootstrap(candleData);
-
-                        this._interogate(strategy, coin);
-                    });
-
-                    await this._timeout(10 * 1000);
-                }
+            // stop if we currently have one position on coin
+            if (this.coins[coin].hasPosition) {
+                return;
             }
-        }
+
+            // if data is still gathering, wait for data
+            if (!this.exchangeClient.hasCandleDataFor(coin)) {
+                return;
+            }
+            // feed candle data
+            this.strategy.bootstrap(this.exchangeClient.getCandleDataFor(coin));
+
+            this._interogate(coin);
+        });
     }
 
-    _interogate(strategy, coin) {
-        const stepSize = this.exchangeInfo[coin].stepSize;
+    _interogate(coin) {
+        if (this.strategy.isSignalLong()) {
+            const stepSize = this.exchangeClient.getExchangeInfo(
+                coin,
+                "stepSize"
+            );
 
-        // this.addToLog(
-        //     `Interogating ${
-        //         strategy.constructor.name
-        //     }, price is ${strategy.getCurrentPrice()}`
-        // );
+            const quantity = this.strategy.getQuantity(coin, stepSize);
 
-        if (strategy.isInPosition()) {
-            if (
-                strategy.isCoinInPosition(coin) &&
-                strategy.canClosePosition()
-            ) {
-                const quantity = strategy.getQuantity(coin, stepSize);
-
-                if (strategy.getConfig("isTest")) {
-                    strategy.setLastPosition(
-                        { price: strategy.getCurrentPrice() },
-                        null,
-                        true
-                    );
-
-                    this._addToLog(
-                        `We can close position on ${coin}, strategy ${strategy.getFullConfigName()}`,
-                        "close-position"
-                    );
-                    return;
-                }
-
-                this.exchangeClient
-                    .closePosition(
-                        coin,
-                        strategy.isCurrentSide("SELL") ? "BUY" : "SELL"
-                    )
-                    .then(() =>
-                        strategy.setLastPosition(
-                            { price: strategy.getCurrentPrice() },
-                            null,
-                            true
-                        )
-                    );
-            }
+            this.exchangeClient.openLong(coin, quantity);
 
             return;
         }
 
-        if (strategy.isSignalLong()) {
-            const quantity = strategy.getQuantity(coin, stepSize);
+        if (this.strategy.isSignalShort()) {
+            const stepSize = this.exchangeClient.getExchangeInfo(
+                coin,
+                "stepSize"
+            );
+            const quantity = this.strategy.getQuantity(coin, stepSize);
 
-            if (strategy.getConfig("isTest")) {
-                strategy.setLastPosition(
-                    {
-                        symbol: coin,
-                        quantity,
-                        price: strategy.getCurrentPrice(),
-                    },
-                    strategy.BUY,
-                    false
-                );
-
-                this._addToLog(
-                    `Signal is long, coin ${coin}, strategy ${strategy.getFullConfigName()}`,
-                    "enter-position"
-                );
-                this._addToLog(
-                    `- currently in a position, ${
-                        strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
-                    }`,
-                    strategy.getLastPosition("symbol")
-                );
-                this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
-                this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
-
-                return;
-            }
-
-            this.exchangeClient
-                .openLong(coin, quantity)
-                .then((response) =>
-                    strategy.setLastPosition(response, strategy.BUY, false)
-                );
-
-            return;
-        }
-
-        if (strategy.isSignalShort()) {
-            const quantity = strategy.getQuantity(coin, stepSize);
-
-            if (strategy.getConfig("isTest")) {
-                strategy.setLastPosition(
-                    {
-                        symbol: coin,
-                        quantity,
-                        price: strategy.getCurrentPrice(),
-                    },
-                    strategy.SELL,
-                    false
-                );
-
-                this._addToLog(
-                    `Signal is short, coin ${coin}, strategy, ${strategy.getFullConfigName()}`,
-                    "enter-position"
-                );
-                this._addToLog(
-                    `- currently in a position, ${
-                        strategy.isCurrentSide("BUY") ? "LONG" : "SHORT"
-                    }`,
-                    strategy.getLastPosition("symbol")
-                );
-                this._addToLog(`- TP at ${strategy.getTakeProfitPrice()}`);
-                this._addToLog(`- SL at ${strategy.getStopLossPrice()}`);
-
-                return;
-            }
-
-            this.exchangeClient.openShort(coin, quantity).then((response) => {
-                const data = Object.assign({}, response, {
-                    price: strategy.getCurrentPrice(),
-                });
-
-                strategy.setLastPosition(data, strategy.SELL, false);
-            });
+            this.exchangeClient.openShort(coin, quantity);
         }
     }
 }

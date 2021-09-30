@@ -5,8 +5,8 @@ class Engulfing extends AbstractStrategy {
     run() {
         // get previous and current low price
         // get previous and current close price
-        this.previousCandle = this.getCandleData().getCandle(-3);
-        this.lastCandle = this.getCandleData().getCandle(-2);
+        this.previousCandle = this.getCandleData().getCandle(-2);
+        this.lastCandle = this.getCandleData().getCandle(-1);
     }
 
     isSignalLong() {

@@ -1,10 +1,12 @@
 {
     "dependencies": {
+        "axios": "^0.21.4",
         "binance-api-node": "^0.11.13",
         "dayjs": "^1.10.6",
         "dotenv": "^9.0.2",
         "lodash": "^4.17.21",
         "node-fetch": "^2.6.1",
-        "object-hash": "^2.2.0"
+        "object-hash": "^2.2.0",
+        "ws": "^8.2.2"
     }
 }
