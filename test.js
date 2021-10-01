@@ -22,17 +22,29 @@ binance.subscribeToPosition(async (evt) => {
         evt.side === "BUY" ? -1 : 1
     );
 
-    await binance.addStopLoss(stopLossPrice, evt);
+    await binance.addStopLoss({
+        symbol: "ETHUSDT",
+        side: "SELL",
+        type: "LIMIT",
+        quantity: 0.006,
+        price: stopLossPrice,
+    });
 
     const profitPrice = strategy.getTakeProfitPrice(
         3200.08,
         evt.side === "BUY" ? 1 : -1
     );
 
-    await binance.addTakeProfit(profitPrice, evt);
+    await binance.addTakeProfit({
+        symbol: "ETHUSDT",
+        side: "SELL",
+        type: "LIMIT",
+        quantity: 0.006,
+        price: profitPrice,
+    });
 });
 
 setTimeout(() => {
-    binance.setManualCurrentPrice("ETHUSDT", 3212.7);
+    binance.setManualCurrentPrice("ETHUSDT", 3228.7);
     binance.openLong("ETHUSDT", 20);
 }, 3000);

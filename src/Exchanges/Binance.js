@@ -186,25 +186,28 @@ class Binance extends AbstractExchange {
         return data;
     }
 
-    async addStopLoss(price, data) {
+    async addStopLoss(evt) {
         const data = {
-            symbol: coin,
-            side: "BUY",
+            symbol: evt.symbol,
+            side: evt.side,
             type: "LIMIT",
-            quantity,
-            price: this.getCurrentPrice(coin),
+            quantity: evt.quantity,
+            price: evt.price,
             useServerTime: true,
         };
 
         await this.client.futuresOrder(data);
     }
 
-    async addTakeProfit(price, evt) {
-        const data = Object.assign({}, evt, {
-            reduceOnly: true,
-            price,
+    async addTakeProfit(evt) {
+        const data = {
+            symbol: evt.symbol,
+            side: evt.side,
+            type: "TAKE_PROFIT",
+            quantity: evt.quantity,
+            stopPrice: evt.price,
             useServerTime: true,
-        });
+        };
 
         await this.client.futuresOrder(data);
     }
