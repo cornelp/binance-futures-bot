@@ -1,7 +1,6 @@
 const LastPosition = require("./../Support/Strategies/LastPosition");
 const StrategyConfig = require("../Support/Strategies/StrategyConfig");
 const CandleDataHelper = require("../Support/Strategies/CandleDataHelper");
-const hash = require("object-hash");
 
 class AbstractStrategy {
     constructor(overwriteConfig = {}) {
@@ -14,11 +13,7 @@ class AbstractStrategy {
             this.config.mergeConfig(overwriteConfig);
         }
 
-        this.fullConfigName = hash(
-            Object.assign({}, { name: this.constructor.name }, overwriteConfig)
-        );
-
-        this.lastPosition = new LastPosition(this.fullConfigName);
+        this.lastPosition = new LastPosition(this.constructor.name);
     }
 
     getFullConfigName() {
@@ -37,26 +32,6 @@ class AbstractStrategy {
 
     getConfig(index = null) {
         return this.config.get(index);
-    }
-
-    getIntervalForCoin(coin) {
-        if (!this.coins) {
-            this.getCoins();
-        }
-
-        if (!this.intervals) {
-            this.intervals = this.config
-                .get("interval")
-                .split(",")
-                .filter((item) => item);
-        }
-
-        // get index for coin
-        let index = this.coins.findIndex((c) => c === coin);
-
-        if (!index) index = 0;
-
-        return this.intervals[index] || this.intervals[0];
     }
 
     getCoins() {
@@ -78,96 +53,36 @@ class AbstractStrategy {
         return this.lastPosition.get(name);
     }
 
-    // gets the current side
-    // takes into consideration isFinal
-    // - should be used for opening a new order
-    getNextSide() {
-        let type = this.getLastPosition("type");
-        const isFinal = this.getLastPosition("isFinal");
-
-        if (isFinal) return type * -1;
-
-        if (!type) return this.BUY;
-
-        return type;
-    }
-
-    // checks if the current side is of type
-    // does not check isFinal
-    // - should be used for closing a position
-    isCurrentSide(type = "BUY") {
-        let configType = this.getLastPosition("type");
-
-        if (configType === undefined) {
-            configType = this.BUY;
-        }
-
-        return configType === this[type.toUpperCase()];
-    }
-
-    isCoinInPosition(coin) {
-        const symbol = this.getLastPosition("symbol");
-
-        return symbol === coin;
-    }
-
-    isInPosition(coin) {
-        const isFinal = this.getLastPosition("isFinal");
-
-        if (isFinal === undefined) {
-            return false;
-        }
-
-        return !isFinal;
-    }
-
     getCurrentPrice() {
         return this.candleDataHelper.getCurrentPrice();
     }
 
-    getQuantity(price, stepSize) {
-        if (
-            this.getConfig().hasOwnProperty("isFinal") &&
-            !this.getConfig("isFinal")
-        ) {
-            return this.getLastPosition("quantity");
-        }
-
-        return (this.getConfig("amount") / this.getCurrentPrice()).toFixed(
-            stepSize
-        );
+    getAmount() {
+        return parseFloat(this.getConfig("amount"));
     }
 
-    getTakeProfitPrice() {
+    getTakeProfitPrice(price, side = 1) {
         const takeProfit = this.getConfig("takeProfit");
-        const currentPrice = parseFloat(this.getCurrentPrice());
-        const lastPositionPrice = parseFloat(this.getLastPosition("price"));
 
         if (!takeProfit) {
             return 0;
         }
 
-        const profitAmount = parseFloat(lastPositionPrice * takeProfit);
+        const profitAmount = parseFloat(price * takeProfit);
 
-        return (
-            parseFloat(lastPositionPrice) + this.getNextSide() * profitAmount
-        );
+        return price + (profitAmount * side < 0 ? -1 : 1);
     }
 
-    getStopLossPrice() {
+    getStopLossPrice(price, side = 1) {
         const stopLoss = this.getConfig("stopLoss");
-        const currentPrice = parseFloat(this.getCurrentPrice());
-        const lastPositionPrice = parseFloat(this.getLastPosition("price"));
 
         if (!stopLoss) {
             return 0;
         }
 
-        const stopLossAmount = parseFloat(lastPositionPrice * stopLoss);
+        const profitAmount = parseFloat(price * stopLoss);
 
-        return (
-            parseFloat(lastPositionPrice) - this.getNextSide() * stopLossAmount
-        );
+        return price + (profitAmount * side < 0 ? -1 : 1);
     }
 
     profitTrigger() {
@@ -201,14 +116,8 @@ class AbstractStrategy {
         return response;
     }
 
-    setLastPosition(position, type = null, isFinal = false) {
-        let toMerge = { isFinal };
-
-        if (type) toMerge.type = type;
-
-        this.getLastPosition().setLastPosition(
-            Object.assign({}, position, toMerge)
-        );
+    logTransaction(data) {
+        this.lastPosition.write(data);
     }
 
     canClosePosition() {

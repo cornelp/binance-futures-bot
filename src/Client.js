@@ -39,13 +39,16 @@ class Client {
         const coins = this.strategy.getCoins();
 
         // check existing positions
+        // also orders
         for (let i = 0; i < coins.length; i++) {
             const coin = coins[i];
             const hasPosition = await this.exchangeClient.coinHasPosition(coin);
+            const hasOrder = await this.exchangeClient.coinHasOrder(coin);
 
-            this.coins[coin] = { hasPosition };
-            console.log("positions", this.coins);
+            this.coins[coin] = { hasPosition, hasOrder };
         }
+
+        console.log(this.coins);
 
         // get exchangeInfo from exchangeClient
         this.exchangeClient.summary(
@@ -55,18 +58,53 @@ class Client {
         );
 
         // run callback when order is filled/partially_filled,
-        this.exchangeClient.subscribeToPosition((evt) => {
+        this.exchangeClient.subscribeToPosition(async (evt) => {
             const coin = evt.symbol;
 
-            // check event type
-            // this.coins[coin].hasPosition = true;
+            console.log("position is now opened");
+
+            // if we have one order filled
+            // if the coin on map does not have hasPosition
+            //      - set hasPosition: true and hasOrder: false
+            // if the coin on map hasPosition
+            //      - that means that the position is gone
+            //      - we can make hasPosition: false and hasOrder: false
+            this.coins[coin].hasPosition
+                ? (this.coins[coin] = { hasPosition: false, hasOrder: false })
+                : (this.coins[coin] = { hasPosition: true, hasOrder: false });
+
+            // save the output somewhere
+            this.strategy.logTransaction({
+                status: this.coins[coin].hasPosition ? "Closed" : "Started",
+                coin,
+                price: evt.price,
+                quantity: evt.quantity,
+                type: evt.side,
+            });
+
+            // if the position is opened now, add TP/SL
+            if (this.coins[coin].hasPosition) {
+                const stopLossPrice = this.strategy.getStopLossPrice(
+                    this.exchangeClient.getCurrentPrice(),
+                    evt.side === "BUY" ? -1 : 1
+                );
+
+                await this.exchangeClient.addStopLoss(stopLossPrice, evt);
+
+                const profitPrice = this.strategy.getTakeProfitPrice(
+                    this.exchangeClient.getCurrentPrice(),
+                    evt.side === "BUY" ? 1 : -1
+                );
+
+                await this.exchangeClient.addTakeProfit(profitPrice, evt);
+            }
         });
 
         this.exchangeClient.setOnCandle((candle) => {
             const coin = candle.symbol;
 
             // stop if we currently have one position on coin
-            if (this.coins[coin].hasPosition) {
+            if (this.coins[coin].hasPosition || this.coins[coin].hasOrder) {
                 return;
             }
 
@@ -74,6 +112,7 @@ class Client {
             if (!this.exchangeClient.hasCandleDataFor(coin)) {
                 return;
             }
+
             // feed candle data
             this.strategy.bootstrap(this.exchangeClient.getCandleDataFor(coin));
 
@@ -83,26 +122,15 @@ class Client {
 
     _interogate(coin) {
         if (this.strategy.isSignalLong()) {
-            const stepSize = this.exchangeClient.getExchangeInfo(
-                coin,
-                "stepSize"
-            );
-
-            const quantity = this.strategy.getQuantity(coin, stepSize);
-
-            this.exchangeClient.openLong(coin, quantity);
+            console.log("signal is long");
+            this.exchangeClient.openLong(coin, this.strategy.getAmount());
 
             return;
         }
 
         if (this.strategy.isSignalShort()) {
-            const stepSize = this.exchangeClient.getExchangeInfo(
-                coin,
-                "stepSize"
-            );
-            const quantity = this.strategy.getQuantity(coin, stepSize);
-
-            this.exchangeClient.openShort(coin, quantity);
+            console.log("signal is short");
+            this.exchangeClient.openShort(coin, this.strategy.getAmount());
         }
     }
 }

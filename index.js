@@ -1,5 +1,6 @@
 const Client = require("./src/Client");
-const BinanceWrapper = require("./src/Exchanges/BinanceWrapper");
+const Binance = require("./src/Exchanges/Binance");
+const Paper = require("./src/Exchanges/Paper");
 const Scalping = require("./src/Strategies/Scalping");
 const Engulfing = require("./src/Strategies/Engulfing");
 const ScalpingEmaMacd = require("./src/Strategies/ScalpingEmaMacd");
@@ -16,6 +17,7 @@ const apiSecret =
 
 new Client()
     .setLogger(new Logger())
-    .setExchangeClient(new BinanceWrapper(apiKey, apiSecret))
+    .setExchangeClient(new Binance(apiKey, apiSecret))
+    // .setExchangeClient(new Paper(apiKey, apiSecret))
     .setStrategy(new Engulfing())
     .run();
