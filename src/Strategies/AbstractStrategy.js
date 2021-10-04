@@ -23,6 +23,8 @@ class AbstractStrategy {
     bootstrap(candleData) {
         this.candleDataHelper = new CandleDataHelper(candleData);
 
+        console.log("price", this.candleDataHelper.getCurrentPrice());
+
         this.run();
     }
 
@@ -58,7 +60,9 @@ class AbstractStrategy {
     }
 
     getAmount() {
-        return parseFloat(this.getConfig("amount"));
+        return parseFloat(
+            this.getConfig("amount") * this.getConfig("leverage")
+        );
     }
 
     getTakeProfitPrice(price, side = 1) {
@@ -68,9 +72,11 @@ class AbstractStrategy {
             return 0;
         }
 
-        const profitAmount = parseFloat(price * takeProfit);
+        return side === 1 ? price * takeProfit : price / takeProfit;
 
-        return price + (profitAmount * side < 0 ? -1 : 1);
+        // const profitAmount = parseFloat(price * takeProfit);
+        //
+        // return price + (profitAmount * side < 0 ? -1 : 1);
     }
 
     getStopLossPrice(price, side = 1) {
@@ -80,9 +86,11 @@ class AbstractStrategy {
             return 0;
         }
 
-        const profitAmount = parseFloat(price * stopLoss);
+        return side === 1 ? price * stopLoss : price / stopLoss;
 
-        return price + (profitAmount * side < 0 ? -1 : 1);
+        // const profitAmount = parseFloat(price * stopLoss);
+        //
+        // return price + (profitAmount * side < 0 ? -1 : 1);
     }
 
     profitTrigger() {

@@ -1,9 +1,9 @@
 module.exports = {
-    symbol: "ETHUSDT",
-    interval: "1m",
+    symbol: "EGLDUSDT",
+    interval: "5m",
     candleCount: 2,
-    amount: 20,
+    amount: 200,
     leverage: 3,
-    takeProfit: 0.5 / 100, // zero for no takeProfitTrigger
-    stopLoss: 0.4 / 100, // zero for no stopLossTrigger
+    takeProfit: 1.005, // zero for no takeProfitTrigger
+    stopLoss: 1.004, // zero for no stopLossTrigger
 };

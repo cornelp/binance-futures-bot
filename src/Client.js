@@ -1,137 +1,150 @@
 class Client {
-  constructor() {
-    this.coins = {};
-  }
-
-  setLogger(logger) {
-    this.logger = logger;
-
-    return this;
-  }
-
-  _addToLog(message, title = null) {
-    if (!this.logger) {
-      return;
+    constructor() {
+        this.coins = {};
     }
 
-    this.logger.write(message, title);
+    setLogger(logger) {
+        this.logger = logger;
 
-    console.log(`${message}, ${title || ""}`);
-  }
-
-  setStrategy(strategy) {
-    this.strategy = strategy;
-
-    return this;
-  }
-
-  setExchangeClient(wrapper) {
-    this.exchangeClient = wrapper;
-
-    return this;
-  }
-
-  _timeout(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  async run() {
-    const coins = this.strategy.getCoins();
-
-    // check existing positions
-    // also orders
-    for (let i = 0; i < coins.length; i++) {
-      const coin = coins[i];
-      const hasPosition = await this.exchangeClient.coinHasPosition(coin);
-      const hasOrder = await this.exchangeClient.coinHasOrder(coin);
-
-      this.coins[coin] = { hasPosition, hasOrder };
+        return this;
     }
 
-    console.log(this.coins);
+    _addToLog(message, title = null) {
+        if (!this.logger) {
+            return;
+        }
 
-    // get exchangeInfo from exchangeClient
-    this.exchangeClient.summary(
-      coins,
-      this.strategy.getConfig("interval"),
-      this.strategy.getConfig("candleCount")
-    );
+        this.logger.write(message, title);
 
-    // run callback when order is filled/partially_filled,
-    this.exchangeClient.subscribeToPosition(async (evt) => {
-      const coin = evt.symbol;
+        console.log(`${message}, ${title || ""}`);
+    }
 
-      // if we have one order filled
-      // if the coin on map does not have hasPosition
-      //      - set hasPosition: true and hasOrder: false
-      // if the coin on map hasPosition
-      //      - that means that the position is gone
-      //      - we can make hasPosition: false and hasOrder: false
-      this.coins[coin].hasPosition
-        ? (this.coins[coin] = { hasPosition: false, hasOrder: false })
-        : (this.coins[coin] = { hasPosition: true, hasOrder: false });
+    setStrategy(strategy) {
+        this.strategy = strategy;
 
-      // save the output somewhere
-      this.strategy.logTransaction({
-        status: this.coins[coin].hasPosition ? "Started" : "Closed",
-        coin,
-        price: evt.price,
-        quantity: evt.quantity,
-        type: evt.side,
-      });
+        return this;
+    }
 
-      // if the position is opened now, add TP/SL
-      if (this.coins[coin].hasPosition) {
-        const stopLossPrice = this.strategy.getStopLossPrice(
-          this.exchangeClient.getCurrentPrice(),
-          evt.side === "BUY" ? -1 : 1
+    setExchangeClient(wrapper) {
+        this.exchangeClient = wrapper;
+
+        return this;
+    }
+
+    _timeout(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async run() {
+        const coins = this.strategy.getCoins();
+
+        // check existing positions
+        // also orders
+        for (let i = 0; i < coins.length; i++) {
+            const coin = coins[i];
+            const hasPosition = await this.exchangeClient.coinHasPosition(coin);
+            const hasOrder = await this.exchangeClient.coinHasOrder(coin);
+
+            this.coins[coin] = { hasPosition, hasOrder };
+        }
+
+        console.log(this.coins);
+
+        // get exchangeInfo from exchangeClient
+        this.exchangeClient.summary(
+            coins,
+            this.strategy.getConfig("interval"),
+            this.strategy.getConfig("candleCount")
         );
 
-        await this.exchangeClient.addStopLoss(stopLossPrice, evt);
+        // run callback when order is filled/partially_filled,
+        this.exchangeClient.subscribeToPosition(async (evt) => {
+            const coin = evt.symbol;
 
-        const profitPrice = this.strategy.getTakeProfitPrice(
-          this.exchangeClient.getCurrentPrice(),
-          evt.side === "BUY" ? 1 : -1
-        );
+            // if we have one order filled
+            // if the coin on map does not have hasPosition
+            //      - set hasPosition: true and hasOrder: false
+            // if the coin on map hasPosition
+            //      - that means that the position is gone
+            //      - we can make hasPosition: false and hasOrder: false
 
-        await this.exchangeClient.addTakeProfit(profitPrice, evt);
-      }
-    });
+            this.coins[coin].hasPosition
+                ? (this.coins[coin] = { hasPosition: false, hasOrder: false })
+                : (this.coins[coin] = { hasPosition: true, hasOrder: false });
 
-    this.exchangeClient.setOnCandle((candle) => {
-      console.log(candle);
-      const coin = candle.symbol;
+            // save the output somewhere
+            this.strategy.logTransaction({
+                status: this.coins[coin].hasPosition ? "Started" : "Closed",
+                coin,
+                price: parseFloat(evt.price).toFixed(2),
+                type: evt.side,
+            });
 
-      // stop if we currently have one position on coin
-      if (this.coins[coin].hasPosition || this.coins[coin].hasOrder) {
-        return;
-      }
+            // if the position is opened now, add TP/SL
+            if (this.coins[coin].hasPosition) {
+                const stopLossPrice = this.strategy.getStopLossPrice(
+                    this.exchangeClient.getCurrentPrice(),
+                    evt.side === "BUY" ? -1 : 1
+                );
 
-      // if data is still gathering, wait for data
-      if (!this.exchangeClient.hasCandleDataFor(coin)) {
-        return;
-      }
+                this.strategy.logTransaction({
+                    status: "stopLossPrice",
+                    coin,
+                    price: stopLossPrice,
+                    type: evt.side,
+                });
 
-      // feed candle data
-      this.strategy.bootstrap(this.exchangeClient.getCandleDataFor(coin));
+                await this.exchangeClient.addStopLoss(coin, stopLossPrice);
 
-      this._interogate(coin);
-    });
-  }
+                const profitPrice = this.strategy.getTakeProfitPrice(
+                    this.exchangeClient.getCurrentPrice(),
+                    evt.side === "BUY" ? 1 : -1
+                );
 
-  _interogate(coin) {
-    if (this.strategy.isSignalLong()) {
-      console.log("signal is long");
-      this.exchangeClient.openLong(coin, this.strategy.getAmount());
+                this.strategy.logTransaction({
+                    status: "takeProfit",
+                    coin,
+                    price: profitPrice,
+                    type: evt.side,
+                });
 
-      return;
+                await this.exchangeClient.addTakeProfit(coin, profitPrice);
+            }
+        });
+
+        this.exchangeClient.setOnCandle((candle) => {
+            const coin = candle.symbol;
+
+            // stop if we currently have one position on coin
+            if (this.coins[coin].hasPosition || this.coins[coin].hasOrder) {
+                return;
+            }
+
+            // if data is still gathering, wait for data
+            if (!this.exchangeClient.hasCandleDataFor(coin)) {
+                return;
+            }
+
+            // feed candle data
+            this.strategy.bootstrap(this.exchangeClient.getCandleDataFor(coin));
+
+            this._interogate(coin);
+        });
     }
 
-    if (this.strategy.isSignalShort()) {
-      console.log("signal is short");
-      this.exchangeClient.openShort(coin, this.strategy.getAmount());
+    _interogate(coin) {
+        if (this.strategy.isSignalLong()) {
+            console.log("signal is long");
+            this.exchangeClient.openLong(coin, this.strategy.getAmount());
+
+            return;
+        }
+
+        if (this.strategy.isSignalShort()) {
+            console.log("signal is short");
+            this.exchangeClient.openShort(coin, this.strategy.getAmount());
+        }
     }
-  }
 }
 
 module.exports = Client;
