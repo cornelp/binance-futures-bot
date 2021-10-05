@@ -88,7 +88,7 @@ class Binance extends AbstractExchange {
     }
 
     _subscribe(coins, interval, candleCount = 200) {
-        coins.forEach((coin) => {
+        coins.forEach(async (coin) => {
             this.candleData[coin] = [];
 
             if (candleCount <= 2) {
@@ -96,11 +96,11 @@ class Binance extends AbstractExchange {
             }
 
             // fetch warmup candles
-            this.candleData[coin] = await this.client.futuresCandles(
-                coin,
+            this.candleData[coin] = await this.client.futuresCandles({
+                symbol: coin,
                 interval,
-                candleCount - 1
-            );
+                limit: candleCount - 1,
+            });
         }, this);
 
         this.client.ws.futuresCandles(coins, interval, (candle) => {
@@ -149,14 +149,17 @@ class Binance extends AbstractExchange {
         return this.exchangeInfo.symbols[coin][item];
     }
 
-    getCurrentPrice(coin, multiplier = true) {
+    getCurrentPrice(coin, multiplier = true, stepSize) {
         console.log("current price is now", this.currentPrice[coin]);
-        return this.currentPrice[coin] + (!multiplier ? -0.02 : 0.02);
+        return parseFloat(
+            this.currentPrice[coin] + (!multiplier ? -0.02 : 0.02)
+        ).toFixed(stepSize);
     }
 
     async openLong(coin, amount) {
+        const stepSize = this.getExchangeInfo(coin, "stepSize");
         const quantity = (amount / this.getCurrentPrice(coin)).toFixed(
-            this.getExchangeInfo(coin, "stepSize")
+            stepSize
         );
 
         const data = {
@@ -164,7 +167,7 @@ class Binance extends AbstractExchange {
             side: "BUY",
             type: "LIMIT",
             quantity,
-            price: this.getCurrentPrice(coin),
+            price: this.getCurrentPrice(coin, true, stepSize),
             // timeInForce: "IOC",
             timeInForce: "GTC",
             useServerTime: true,
@@ -178,15 +181,16 @@ class Binance extends AbstractExchange {
 
     async openShort(coin, amount) {
         // first calculate quantity
+        const stepSize = this.getExchangeInfo(coin, "stepSize");
         const quantity = (amount / this.getCurrentPrice(coin, false)).toFixed(
-            this.getExchangeInfo(coin, "stepSize")
+            stepSize
         );
 
         const data = {
             symbol: coin,
             side: "SELL",
             type: "LIMIT",
-            price: this.getCurrentPrice(coin, false),
+            price: this.getCurrentPrice(coin, false, stepSize),
             quantity,
             // timeInForce: "IOC",
             timeInForce: "GTC",
@@ -203,9 +207,9 @@ class Binance extends AbstractExchange {
         const data = {
             symbol: coin,
             side: evt.side,
-            type: "STOP_LOSS_LIMIT",
+            type: "LIMIT",
             quantity: evt.quantity,
-            stopPrice: stopLossPrice,
+            price: stopLossPrice,
             reduceOnly: true,
             useServerTime: true,
         };
@@ -217,9 +221,9 @@ class Binance extends AbstractExchange {
         const data = {
             symbol: coin,
             side: evt.side,
-            type: "TAKE_PROFIT_LIMIT",
+            type: "LIMIT",
             quantity: evt.quantity,
-            stopPrice: takeProfitPrice,
+            price: takeProfitPrice,
             reduceOnly: true,
             useServerTime: true,
         };

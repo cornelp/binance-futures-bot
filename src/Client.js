@@ -68,6 +68,11 @@ class Client {
             //      - that means that the position is gone
             //      - we can make hasPosition: false and hasOrder: false
 
+            // if the coin is not within our strategy
+            if (!this.coins[coin]) {
+                return;
+            }
+
             this.coins[coin].hasPosition
                 ? (this.coins[coin] = { hasPosition: false, hasOrder: false })
                 : (this.coins[coin] = {
