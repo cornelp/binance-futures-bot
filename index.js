@@ -17,8 +17,8 @@ const apiSecret =
 
 new Client()
     .setLogger(new Logger())
-    // .setExchangeClient(new Binance(apiKey, apiSecret))
-    .setExchangeClient(new Paper(apiKey, apiSecret))
+    .setExchangeClient(new Binance(apiKey, apiSecret))
+    // .setExchangeClient(new Paper(apiKey, apiSecret))
     // .setStrategy(new Engulfing())
     .setStrategy(new Scalping())
     .run();

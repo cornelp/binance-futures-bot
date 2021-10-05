@@ -70,7 +70,11 @@ class Client {
 
             this.coins[coin].hasPosition
                 ? (this.coins[coin] = { hasPosition: false, hasOrder: false })
-                : (this.coins[coin] = { hasPosition: true, hasOrder: false });
+                : (this.coins[coin] = {
+                      hasPosition: true,
+                      hasOrder: false,
+                      order: evt,
+                  });
 
             // save the output somewhere
             this.strategy.logTransaction({
@@ -94,7 +98,7 @@ class Client {
                     type: evt.side,
                 });
 
-                await this.exchangeClient.addStopLoss(coin, stopLossPrice);
+                await this.exchangeClient.addStopLoss(coin, stopLossPrice, evt);
 
                 const profitPrice = this.strategy.getTakeProfitPrice(
                     this.exchangeClient.getCurrentPrice(),
@@ -108,7 +112,7 @@ class Client {
                     type: evt.side,
                 });
 
-                await this.exchangeClient.addTakeProfit(coin, profitPrice);
+                await this.exchangeClient.addTakeProfit(coin, profitPrice, evt);
             }
         });
 
