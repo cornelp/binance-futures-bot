@@ -80,7 +80,7 @@ class Binance extends AbstractExchange {
         this.candleCount = candleCount;
 
         this._fetchExchangeInfo(coins);
-        this._subscribe(coins, interval);
+        // this._subscribe(coins, interval);
     }
 
     setManualCurrentPrice(coin, price) {
@@ -149,17 +149,22 @@ class Binance extends AbstractExchange {
         return this.exchangeInfo.symbols[coin][item];
     }
 
-    getCurrentPrice(coin, multiplier = true, stepSize) {
+    getCurrentPrice(coin, multiplier = true) {
         console.log("current price is now", this.currentPrice[coin]);
-        return parseFloat(
-            this.currentPrice[coin] + (!multiplier ? -0.02 : 0.02)
-        ).toFixed(stepSize);
+        let price = this.currentPrice[coin] + (!multiplier ? -0.02 : 0.02);
+
+        return this.formatPrice(coin, price);
+    }
+
+    formatPrice(coin, price) {
+        const tick = this.getExchangeInfo(coin, "tickSize");
+
+        return Math.round(price * (10 ^ tick)) / (10 ^ tick);
     }
 
     async openLong(coin, amount) {
-        const stepSize = this.getExchangeInfo(coin, "stepSize");
         const quantity = (amount / this.getCurrentPrice(coin)).toFixed(
-            stepSize
+            this.getExchangeInfo(coin, "stepSize")
         );
 
         const data = {
@@ -167,8 +172,7 @@ class Binance extends AbstractExchange {
             side: "BUY",
             type: "LIMIT",
             quantity,
-            price: this.getCurrentPrice(coin, true, stepSize),
-            // timeInForce: "IOC",
+            price: this.getCurrentPrice(coin, true),
             timeInForce: "GTC",
             useServerTime: true,
         };
@@ -181,18 +185,16 @@ class Binance extends AbstractExchange {
 
     async openShort(coin, amount) {
         // first calculate quantity
-        const stepSize = this.getExchangeInfo(coin, "stepSize");
         const quantity = (amount / this.getCurrentPrice(coin, false)).toFixed(
-            stepSize
+            this.getExchangeInfo(coin, "stepSize")
         );
 
         const data = {
             symbol: coin,
             side: "SELL",
             type: "LIMIT",
-            price: this.getCurrentPrice(coin, false, stepSize),
+            price: this.getCurrentPrice(coin, false),
             quantity,
-            // timeInForce: "IOC",
             timeInForce: "GTC",
             useServerTime: true,
         };
@@ -204,29 +206,39 @@ class Binance extends AbstractExchange {
     }
 
     async addStopLoss(coin, stopLossPrice, evt) {
+        const price = this.formatPrice(coin, stopLossPrice);
+
         const data = {
             symbol: coin,
             side: evt.side,
-            type: "LIMIT",
+            positionSide: "BOTH",
+            type: "STOP",
             quantity: evt.quantity,
-            price: stopLossPrice,
-            reduceOnly: true,
+            stopPrice: price,
+            price,
+            timeInForce: "GTC",
             useServerTime: true,
         };
+        console.log(data);
 
         await this.client.futuresOrder(data);
     }
 
     async addTakeProfit(coin, takeProfitPrice, evt) {
+        const price = this.formatPrice(coin, takeProfitPrice);
+
         const data = {
             symbol: coin,
-            side: evt.side,
-            type: "LIMIT",
+            side: evt.side === "BUY" ? "SELL" : "BUY",
+            positionSide: "BOTH",
+            type: "TAKE_PROFIT",
             quantity: evt.quantity,
-            price: takeProfitPrice,
-            reduceOnly: true,
+            stopPrice: price,
+            price,
+            timeInForce: "GTC",
             useServerTime: true,
         };
+        console.log(data);
 
         await this.client.futuresOrder(data);
     }

@@ -92,7 +92,7 @@ class Client {
             // if the position is opened now, add TP/SL
             if (this.coins[coin].hasPosition) {
                 const stopLossPrice = this.strategy.getStopLossPrice(
-                    this.exchangeClient.getCurrentPrice(),
+                    evt.price,
                     evt.side === "BUY" ? -1 : 1
                 );
 
@@ -106,7 +106,7 @@ class Client {
                 await this.exchangeClient.addStopLoss(coin, stopLossPrice, evt);
 
                 const profitPrice = this.strategy.getTakeProfitPrice(
-                    this.exchangeClient.getCurrentPrice(),
+                    evt.price,
                     evt.side === "BUY" ? 1 : -1
                 );
 
