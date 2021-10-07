@@ -9,16 +9,6 @@ class Client {
         return this;
     }
 
-    _addToLog(message, title = null) {
-        if (!this.logger) {
-            return;
-        }
-
-        this.logger.write(message, title);
-
-        console.log(`${message}, ${title || ""}`);
-    }
-
     setStrategy(strategy) {
         this.strategy = strategy;
 
@@ -29,10 +19,6 @@ class Client {
         this.exchangeClient = wrapper;
 
         return this;
-    }
-
-    _timeout(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     async run() {
@@ -73,13 +59,30 @@ class Client {
                 return;
             }
 
-            this.coins[coin].hasPosition
-                ? (this.coins[coin] = { hasPosition: false, hasOrder: false })
-                : (this.coins[coin] = {
-                      hasPosition: true,
-                      hasOrder: false,
-                      order: evt,
-                  });
+            // actually here we're checking if it had a position
+            // and filled event changed that
+            if (!this.coins[coin].hasPosition) {
+                // it means that the newly position was filled
+                this.coins[coin] = {
+                    hasPosition: true,
+                    hasOrder: false,
+                    order: evt,
+                };
+            } else {
+                // get all remaining orders for that specific coin
+                // cancel remaining orders
+                const orders = await this.exchangeClient.getOpenedOrders(coin);
+
+                if (orders && orders.length) {
+                    orders.forEach((order) => {
+                        // we don't need to wait for the transaction to finish - so no await
+                        this.exchangeClient.cancelOrder(coin, order.orderId);
+                    });
+                }
+
+                // save a clean object
+                this.coins[coin] = { hasPosition: false, hasOrder: false };
+            }
 
             // save the output somewhere
             this.strategy.logTransaction({

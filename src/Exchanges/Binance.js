@@ -36,6 +36,20 @@ class Binance extends AbstractExchange {
         return parseFloat(position.positionAmt) !== 0;
     }
 
+    async getOpenedOrders(symbol) {
+        const orders = await this.client.futuresOpenOrders({ symbol });
+
+        return orders;
+    }
+
+    cancelOrder(symbol, orderId) {
+        this.client.futuresCancelOrder({
+            symbol,
+            orderId,
+            useServerTime: true,
+        });
+    }
+
     async _fetchExchangeInfo(coins) {
         const exchangeInfo = await this.client.futuresExchangeInfo();
 
@@ -80,7 +94,7 @@ class Binance extends AbstractExchange {
         this.candleCount = candleCount;
 
         this._fetchExchangeInfo(coins);
-        // this._subscribe(coins, interval);
+        this._subscribe(coins, interval);
     }
 
     setManualCurrentPrice(coin, price) {
@@ -158,8 +172,9 @@ class Binance extends AbstractExchange {
 
     formatPrice(coin, price) {
         const tick = this.getExchangeInfo(coin, "tickSize");
+        const pow = Math.pow(10, tick || 1);
 
-        return Math.round(price * (10 ^ tick)) / (10 ^ tick);
+        return Math.floor(price * pow) / pow;
     }
 
     async openLong(coin, amount) {
@@ -210,7 +225,7 @@ class Binance extends AbstractExchange {
 
         const data = {
             symbol: coin,
-            side: evt.side,
+            side: evt.side === "BUY" ? "SELL" : "BUY",
             positionSide: "BOTH",
             type: "STOP",
             quantity: evt.quantity,
@@ -221,7 +236,9 @@ class Binance extends AbstractExchange {
         };
         console.log(data);
 
-        await this.client.futuresOrder(data);
+        const order = await this.client.futuresOrder(data);
+
+        return order;
     }
 
     async addTakeProfit(coin, takeProfitPrice, evt) {
@@ -240,7 +257,9 @@ class Binance extends AbstractExchange {
         };
         console.log(data);
 
-        await this.client.futuresOrder(data);
+        const order = await this.client.futuresOrder(data);
+
+        return order;
     }
 }
 
