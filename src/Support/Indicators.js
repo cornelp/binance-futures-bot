@@ -217,4 +217,27 @@ module.exports = {
             signal,
         };
     },
+
+    stochasticOscillator(data, length = 14) {
+        if (data.length && data[0].hasOwnProperty("close")) {
+            data = data.map((item) => item.close);
+        }
+
+        const result = [];
+
+        for (let i = 0; i < data.length - length; i++) {
+            const arrSlice = data.slice(i, i + length);
+
+            const lowestSlice = Math.min(...arrSlice);
+            const highestSlice = Math.max(...arrSlice);
+            const currentPrice = arrSlice[arrSlice.length - 1];
+
+            result.push(
+                ((currentPrice - lowestSlice) / (highestSlice - lowestSlice)) *
+                    100
+            );
+        }
+
+        return result;
+    },
 };

@@ -146,14 +146,22 @@ class Client {
 
     _interogate(coin) {
         if (this.strategy.isSignalLong()) {
-            console.log("signal is long");
+            console.log(
+                "signal is long, price",
+                this.strategy.getCurrentPrice()
+            );
+
             this.exchangeClient.openLong(coin, this.strategy.getAmount());
 
             return;
         }
 
         if (this.strategy.isSignalShort()) {
-            console.log("signal is short");
+            console.log(
+                "signal is short, price",
+                this.strategy.getCurrentPrice()
+            );
+
             this.exchangeClient.openShort(coin, this.strategy.getAmount());
         }
     }

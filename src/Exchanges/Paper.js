@@ -1,6 +1,7 @@
 const AbstractExchange = require("./AbstractExchange");
 const fs = require("fs");
 const _ = require("lodash");
+const dayjs = require("dayjs");
 
 class Paper {
     constructor(apiKey, apiSecret) {
@@ -92,16 +93,11 @@ class Paper {
 
         setTimeout(() => this.fillPositionsIfAny(candle), 100);
 
-        // testing purposes
-        // if (index === 40) {
-        //     return;
-        // }
-
         setTimeout(() => {
             if (lines[index + 1]) {
                 this.processAndPushLine(lines, index + 1, symbol);
             }
-        }, 200);
+        }, 300);
     }
 
     fillPositionsIfAny(candle) {
@@ -170,8 +166,27 @@ class Paper {
                 "utf-8"
             );
 
+            const lines = file.split(/\r?\n/);
+
+            const initialData = lines
+                .splice(0, this.candleCount - 1)
+                .map((values) => {
+                    values = values.split(",");
+
+                    return {
+                        time: values[0],
+                        open: parseFloat(values[1]),
+                        close: parseFloat(values[2]),
+                        low: parseFloat(values[3]),
+                        high: parseFloat(values[4]),
+                        symbol,
+                    };
+                });
+
+            this.candleData = initialData;
+
             // read data from it
-            this.processAndPushLine(file.split(/\r?\n/), 0, symbol);
+            this.processAndPushLine(lines, 0, symbol);
         } catch (e) {
             console.log("error", e);
         }
@@ -200,7 +215,13 @@ class Paper {
         );
 
         console.log("opening long");
-        console.log("current price is", price);
+
+        console.log(
+            "long on",
+            dayjs(
+                parseInt(this.candleData[this.candleData.length - 1].time)
+            ).format("DD.MM.YYYY HH:mm:ss")
+        );
 
         const data = this.getTradeTemplate({
             price,
@@ -222,11 +243,18 @@ class Paper {
 
     async openShort(symbol, amount) {
         console.log("opening short");
+
+        console.log(
+            "short on",
+            dayjs(
+                parseInt(this.candleData[this.candleData.length - 1].time)
+            ).format("DD.MM.YYYY HH:mm:ss")
+        );
+
         const price = this.getCurrentPrice(symbol);
         const quantity = (amount / this.getCurrentPrice(symbol)).toFixed(
             this.getExchangeInfo(symbol, "stepSize")
         );
-        console.log("current price is", price);
 
         const data = {
             price: this.getCurrentPrice(symbol, false),
@@ -256,6 +284,14 @@ class Paper {
         console.log("added take profit", price);
 
         this.positions[symbol]["takeProfit"] = price;
+    }
+
+    async cancelOrder(coin, orderId) {
+        //
+    }
+
+    async getOpenedOrders(coin) {
+        return [];
     }
 }
 

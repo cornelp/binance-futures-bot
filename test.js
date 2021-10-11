@@ -1,50 +1,26 @@
-const Binance = require("./src/Exchanges/Binance");
-const Strategy = require("./src/Strategies/Engulfing");
+const Binance = require("binance-api-node").default;
+const fs = require("fs");
 
-const apiKey =
-    "CxoFtnKSXyhCSmVsfg8XrBAIWDCGrfsLOONZjONfkLd2ynwmeRL67OYKYPexC19R";
-const apiSecret =
-    "tx2WF7gAOPVTy7wmAFqSnumqTsmyA4jMGQLOXICCbXDNkVqdWyUknodYiEZ8H4jJ";
+require("dotenv").config();
 
-const strategy = new Strategy();
-const binance = new Binance(apiKey, apiSecret);
+const binance = new Binance(process.env.API_KEY, process.env.API_SECRET);
 
-binance.summary(["ETHUSDT"], "1m", 2);
+binance
+    .futuresCandles({
+        symbol: "BTCBUSD",
+        interval: "1m",
+        limit: 1000,
+        // startTime: 1633035600,
+    })
+    .then((response) => {
+        const list = response
+            .map(
+                (item) =>
+                    `${item.openTime},${item.open},${item.close},${item.high},${item.low}`
+            )
+            .join("\n");
 
-binance.subscribeToPosition(async (evt) => {
-    const coin = evt.symbol;
-
-    console.log("position is now opened");
-
-    // if the position is opened now, add TP/SL
-    const stopLossPrice = strategy.getStopLossPrice(
-        3150.0,
-        evt.side === "BUY" ? -1 : 1
-    );
-
-    await binance.addStopLoss({
-        symbol: "ETHUSDT",
-        side: "SELL",
-        type: "LIMIT",
-        quantity: 0.006,
-        price: stopLossPrice,
+        fs.appendFile("./paper-test.csv", list, (err, data) => {
+            if (err) throw err;
+        });
     });
-
-    const profitPrice = strategy.getTakeProfitPrice(
-        3200.08,
-        evt.side === "BUY" ? 1 : -1
-    );
-
-    await binance.addTakeProfit({
-        symbol: "ETHUSDT",
-        side: "SELL",
-        type: "LIMIT",
-        quantity: 0.006,
-        price: profitPrice,
-    });
-});
-
-setTimeout(() => {
-    binance.setManualCurrentPrice("ETHUSDT", 3228.7);
-    binance.openLong("ETHUSDT", 20);
-}, 3000);

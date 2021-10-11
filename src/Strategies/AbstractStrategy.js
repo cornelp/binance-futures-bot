@@ -1,6 +1,6 @@
 const LastPosition = require("./../Support/Strategies/LastPosition");
-const StrategyConfig = require("../Support/Strategies/StrategyConfig");
-const CandleDataHelper = require("../Support/Strategies/CandleDataHelper");
+const StrategyConfig = require("./../Support/Strategies/StrategyConfig");
+const CandleDataHelper = require("./../Support/Strategies/CandleDataHelper");
 
 class AbstractStrategy {
     constructor(overwriteConfig = {}) {
@@ -22,8 +22,6 @@ class AbstractStrategy {
 
     bootstrap(candleData) {
         this.candleDataHelper = new CandleDataHelper(candleData);
-
-        console.log("price", this.candleDataHelper.getCurrentPrice());
 
         this.run();
     }

@@ -37,7 +37,10 @@ class Binance extends AbstractExchange {
     }
 
     async getOpenedOrders(symbol) {
-        const orders = await this.client.futuresOpenOrders({ symbol });
+        const orders = await this.client.futuresOpenOrders({
+            symbol,
+            useServerTime: true,
+        });
 
         return orders;
     }

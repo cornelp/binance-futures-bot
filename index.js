@@ -1,6 +1,7 @@
 const Client = require("./src/Client");
-const Binance = require("./src/Exchanges/Binance");
-const Scalping = require("./src/Strategies/Scalping");
+// const Binance = require("./src/Exchanges/Binance");
+const Exchange = require("./src/Exchanges/Paper");
+const Strategy = require("./src/Strategies/ScalpingStochastic");
 const Logger = require("./src/Support/Logger");
 
 require("dotenv").config();
@@ -10,6 +11,6 @@ const apiSecret = process.env.API_SECRET;
 
 new Client()
     .setLogger(new Logger())
-    .setExchangeClient(new Binance(apiKey, apiSecret))
-    .setStrategy(new Scalping())
+    .setExchangeClient(new Exchange(apiKey, apiSecret))
+    .setStrategy(new Strategy())
     .run();

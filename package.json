@@ -6,6 +6,7 @@
         "dotenv": "^9.0.2",
         "lodash": "^4.17.21",
         "node-fetch": "^2.6.1",
+        "node-telegram-bot-api": "^0.54.0",
         "object-hash": "^2.2.0",
         "ws": "^8.2.2"
     }
