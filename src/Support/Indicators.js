@@ -75,8 +75,12 @@ module.exports = {
             .filter((item) => item);
     },
 
-    ema(data, length = null) {
+    ema(data, length = null, field = "close") {
         if (!length) length = data.length;
+
+        if (data.length && data[0].hasOwnProperty("close") && field) {
+            data = data.map((item) => item[field]);
+        }
 
         // take another
         const sma = _.sum(_.take(data, length)) / length;
@@ -237,6 +241,35 @@ module.exports = {
                     100
             );
         }
+
+        return result;
+    },
+
+    averageTrueRange(data, length = null) {
+        let result = data.map((item, index, arr) => {
+            if (index === 0) return null;
+
+            const previousItem = arr[index - 1];
+
+            return Math.max(
+                item.high - item.low,
+                Math.abs(item.high - previousItem.close),
+                Math.abs(item.low - previousItem.close)
+            );
+        });
+
+        // remove first element
+        result.shift();
+
+        result = result.map((item, index, arr) => {
+            if (index === 0) return null;
+
+            const previousItem = arr[index - 1];
+
+            return (previousItem * (length - 1) + item) / length;
+        });
+
+        result.shift();
 
         return result;
     },
